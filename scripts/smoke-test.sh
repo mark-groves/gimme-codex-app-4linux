@@ -36,7 +36,7 @@ if [ -n "${1:-}" ]; then
   build_dir="$1"
 fi
 
-if [ -z "$build_dir" ]; then
+if [ -z "$build_dir" ] && [ -d dist ]; then
   build_dir="$(find dist -maxdepth 1 -type d -name 'codex-linux-*' -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR == 1 { print $2 }')"
 fi
 

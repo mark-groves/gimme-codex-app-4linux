@@ -337,3 +337,5 @@ The target is intentionally a manual `make smoke-test` workflow, not part of `ma
 On 2026-05-03, PR review found the smoke-test CLI preflight did not accept the launcher-supported `CODEX_CLI_PATH` configuration before checking fallback locations. The smoke test now treats an executable `CODEX_CLI_PATH` as sufficient, matching the generated launcher's supported stable CLI override.
 
 On 2026-05-03, a follow-up review found the smoke-test preflight still missed the launcher's `$HOME/.local/bin/codex` fallback when that directory is not on `PATH`. Keep manual smoke-test CLI preflight checks aligned with `resolve_codex_cli` so supported launcher configurations are not rejected before launch.
+
+On 2026-05-03, another review found `scripts/smoke-test.sh` could abort during default build discovery when `dist/` does not exist because the `find | sort | awk` command substitution runs under `set -e -o pipefail`. The script now checks for `dist/` before running discovery so first-run users reach the explicit "No converted build found" guidance.

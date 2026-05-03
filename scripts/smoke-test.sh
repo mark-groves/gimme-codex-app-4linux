@@ -60,8 +60,8 @@ if [ -n "${CODEX_CLI_PATH:-}" ]; then
     printf 'CODEX_CLI_PATH is set but not executable: %s\n' "$CODEX_CLI_PATH" >&2
     exit 1
   fi
-elif ! command -v codex >/dev/null 2>&1 && [ ! -x /usr/bin/codex ] && [ ! -x /usr/local/bin/codex ]; then
-  printf 'Codex CLI was not found. Set executable CODEX_CLI_PATH or install codex on PATH, /usr/bin/codex, or /usr/local/bin/codex.\n' >&2
+elif ! command -v codex >/dev/null 2>&1 && [ ! -x /usr/bin/codex ] && [ ! -x /usr/local/bin/codex ] && [ ! -x "$HOME/.local/bin/codex" ]; then
+  printf 'Codex CLI was not found. Set executable CODEX_CLI_PATH or install codex on PATH, /usr/bin/codex, /usr/local/bin/codex, or ~/.local/bin/codex.\n' >&2
   exit 1
 fi
 

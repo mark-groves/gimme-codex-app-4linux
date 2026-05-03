@@ -335,3 +335,5 @@ On 2026-05-03, `scripts/smoke-test.sh` was added to make the manual visual launc
 The target is intentionally a manual `make smoke-test` workflow, not part of `make check`, because it requires a live graphical session. A local run against `dist/codex-linux-prod-26.429.30905` passed on 2026-05-03.
 
 On 2026-05-03, PR review found the smoke-test CLI preflight did not accept the launcher-supported `CODEX_CLI_PATH` configuration before checking fallback locations. The smoke test now treats an executable `CODEX_CLI_PATH` as sufficient, matching the generated launcher's supported stable CLI override.
+
+On 2026-05-03, a follow-up review found the smoke-test preflight still missed the launcher's `$HOME/.local/bin/codex` fallback when that directory is not on `PATH`. Keep manual smoke-test CLI preflight checks aligned with `resolve_codex_cli` so supported launcher configurations are not rejected before launch.

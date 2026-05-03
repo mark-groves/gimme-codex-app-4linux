@@ -31,6 +31,14 @@ bash scripts/install-local.sh
 codex-linux
 ```
 
+Run a focused graphical smoke test against the newest build in `dist/`:
+
+```bash
+make smoke-test
+```
+
+The smoke test launches with a temporary `CODEX_ELECTRON_USER_DATA_PATH`, waits for the app window to reach `ready-to-show`, and confirms the Codex CLI connection appears in the app logs. It must run from a desktop session with `DISPLAY` or `WAYLAND_DISPLAY` set.
+
 On Omarchy / Arch, `openai-codex` installs the stable CLI at `/usr/bin/codex`. The generated launcher prefers that pacman-managed binary over older `npx` wrappers or transient npm cache paths. If you are not on Arch, install the official CLI into a stable location:
 
 ```bash

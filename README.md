@@ -31,6 +31,17 @@ bash scripts/install-local.sh
 codex-linux
 ```
 
+To build a local pacman package instead of installing the lightweight user symlink:
+
+```bash
+make build
+make pacman-package
+sudo pacman -U dist/pacman/codex-linux-*.pkg.tar.zst
+codex-linux
+```
+
+The package is local and unofficial. It installs the converted app to `/opt/codex-linux`, exposes `/usr/bin/codex-linux`, and owns `/usr/share/applications/codex-linux.desktop`. It does not install automatically; use `sudo pacman -U` explicitly when you want the package on the system.
+
 Run a focused graphical smoke test against the newest build in `dist/`:
 
 ```bash
@@ -68,6 +79,7 @@ Generated output is local-only and ignored by git:
 - `dist/codex-linux-prod-<version>/codex-electron`: renamed Linux Electron runtime so Electron treats the app as packaged.
 - `dist/codex-linux-prod-<version>/resources/app`: extracted Codex Electron app.
 - `dist/codex-linux-prod-<version>/resources/codex-linux-build.json`: source URL, appcast build, SHA-256, Electron version, and target platform.
+- `dist/pacman/codex-linux-<version>.<build>-1-x86_64.pkg.tar.zst`: optional local Arch package built from the prod output.
 
 ## Docs
 

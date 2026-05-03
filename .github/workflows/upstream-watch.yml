@@ -1,0 +1,23 @@
+name: upstream-watch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+jobs:
+  appcast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check appcast drift
+        run: node scripts/check-upstream.mjs --compare data/upstream.json > upstream-current.json
+      - name: Upload current metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-current
+          path: upstream-current.json

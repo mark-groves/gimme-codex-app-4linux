@@ -334,6 +334,7 @@ async function patchExtractedApp({ appDir, channel, latest, packageJson }) {
   await fs.writeFile(path.join(appDir, "package.json"), `${JSON.stringify(nextPackageJson, null, 2)}\n`);
   await hideDefaultLinuxApplicationMenu(appDir);
   await makeLinuxAppWindowsOpaque(appDir);
+  await addLinuxOpenTargets(appDir);
 }
 
 async function hideDefaultLinuxApplicationMenu(appDir) {
@@ -365,6 +366,60 @@ async function makeLinuxAppWindowsOpaque(appDir) {
     throw new Error("could not find Electron background-color helper to make Linux app windows opaque");
   }
   await fs.writeFile(mainBuildPath, mainBuild.replace(marker, replacement));
+}
+
+async function addLinuxOpenTargets(appDir) {
+  const mainBuildPath = await findMainBuildPath(appDir);
+  let mainBuild = await fs.readFile(mainBuildPath, "utf8");
+  const replacements = [
+    {
+      marker:
+        "function ih({id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,darwinEnv:a,darwinArgs:o,hidden:s}){return{id:e,platforms:{darwin:r?{label:t,icon:n,kind:`editor`,hidden:s,detect:r,env:a,args:o??ah,supportsSsh:!0}:void 0,win32:i?{label:t,icon:n,kind:`editor`,hidden:s,detect:i,args:ah,supportsSsh:!0}:void 0}}}",
+      replacement:
+        "function ih({id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,linuxDetect:c,darwinEnv:a,darwinArgs:o,hidden:s}){return{id:e,platforms:{darwin:r?{label:t,icon:n,kind:`editor`,hidden:s,detect:r,env:a,args:o??ah,supportsSsh:!0}:void 0,win32:i?{label:t,icon:n,kind:`editor`,hidden:s,detect:i,args:ah,supportsSsh:!0}:void 0,linux:c?{label:t,icon:n,kind:`editor`,hidden:s,detect:c,args:ah,supportsSsh:!0}:void 0}}}",
+      description: "could not find Electron open-target helper to add Linux editor support",
+    },
+    {
+      marker:
+        "var Og=ih({id:`vscode`,label:`VS Code`,icon:`apps/vscode.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`,`/Applications/Code.app/Contents/Resources/app/bin/code`]),win32Detect:kg});",
+      replacement:
+        "var Og=ih({id:`vscode`,label:`VS Code`,icon:`apps/vscode.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`,`/Applications/Code.app/Contents/Resources/app/bin/code`]),win32Detect:kg,linuxDetect:()=>q(`code`)});",
+      description: "could not find VS Code open-target marker to add Linux support",
+    },
+    {
+      marker:
+        "var Ag=ih({id:`vscodeInsiders`,label:`VS Code Insiders`,icon:`apps/vscode-insiders.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code`,`/Applications/Code - Insiders.app/Contents/Resources/app/bin/code`]),win32Detect:jg});",
+      replacement:
+        "var Ag=ih({id:`vscodeInsiders`,label:`VS Code Insiders`,icon:`apps/vscode-insiders.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code`,`/Applications/Code - Insiders.app/Contents/Resources/app/bin/code`]),win32Detect:jg,linuxDetect:()=>q(`code-insiders`)});",
+      description: "could not find VS Code Insiders open-target marker to add Linux support",
+    },
+    {
+      marker:
+        "Ih=rh({id:`fileManager`,label:`Finder`,icon:`apps/finder.png`,kind:`fileManager`,darwin:{detect:()=>`open`,args:e=>km(e)},win32:{label:`File Explorer`,icon:`apps/file-explorer.png`,detect:Lh,args:e=>km(e),open:async({path:e})=>Rh(e)}});function Lh(){",
+      replacement:
+        "Ih=rh({id:`fileManager`,label:`Finder`,icon:`apps/finder.png`,kind:`fileManager`,darwin:{detect:()=>`open`,args:e=>km(e)},win32:{label:`File Explorer`,icon:`apps/file-explorer.png`,detect:Lh,args:e=>km(e),open:async({path:e})=>Rh(e)},linux:{label:`Files`,icon:`apps/file-explorer.png`,detect:()=>q(`xdg-open`),args:e=>km(e)}});function Lh(){",
+      description: "could not find file manager open-target marker to add Linux support",
+    },
+    {
+      marker:
+        "var Xg=[Og,Ag,Eg,jh,ch,Fh,gg,Wg,Ng,oh,Wh,yg,Ih,uh,Vh,kh,Fg,Kh,Bh,Mg,zg,Qh,$h,eg,tg,ng,rg,ig,ag,Sg],Zg=t.Pr(`open-in-targets`);",
+      replacement:
+        "function codexLinuxGuiEditor(){for(let e of[`code`,`code-insiders`,`codium`,`cursor`,`zed`,`subl`,`sublime_text`,`gnome-text-editor`,`kate`,`gedit`,`xed`,`mousepad`]){let t=q(e);if(t)return t}return null}function codexLinuxGuiEditorArgs(e,t){let n=codexLinuxGuiEditor(),r=n?(0,i.basename)(n).toLowerCase():``;return t&&[`code`,`code-insiders`,`codium`,`cursor`,`zed`,`subl`,`sublime_text`].some(e=>r.includes(e))?Jm(e,t):[e]}var codexLinuxEditorTarget=rh({id:`linuxEditor`,label:`Text editor`,icon:`apps/vscode.png`,kind:`editor`,linux:{detect:codexLinuxGuiEditor,args:codexLinuxGuiEditorArgs}}),Xg=[Og,Ag,Eg,jh,ch,Fh,gg,Wg,codexLinuxEditorTarget,Ng,oh,Wh,yg,Ih,uh,Vh,kh,Fg,Kh,Bh,Mg,zg,Qh,$h,eg,tg,ng,rg,ig,ag,Sg],Zg=t.Pr(`open-in-targets`);",
+      description: "could not find open-target registry marker to add generic Linux editor support",
+    },
+  ];
+
+  for (const { marker, replacement, description } of replacements) {
+    if (mainBuild.includes(replacement)) {
+      continue;
+    }
+    if (!mainBuild.includes(marker)) {
+      throw new Error(description);
+    }
+    mainBuild = mainBuild.replace(marker, replacement);
+  }
+
+  await fs.writeFile(mainBuildPath, mainBuild);
 }
 
 async function findMainBuildPath(appDir) {

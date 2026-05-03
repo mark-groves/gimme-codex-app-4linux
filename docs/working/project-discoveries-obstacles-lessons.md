@@ -148,6 +148,24 @@ That made the app load bundled `app://` assets instead of trying the dev server.
 
 Future agents should preserve this. Do not "clean up" the renamed runtime back to `electron`.
 
+## Linux Visual Smoke Test: Electron Menu Bar
+
+A visual launch test on Hyprland showed the converted Linux app rendered the Codex onboarding screen correctly, but Electron displayed its default Linux application menu:
+
+```text
+File Edit View Window Help
+```
+
+The app later refreshes its own application menu during startup, so clearing the menu once before `app.whenReady()` was not enough. The builder now patches the extracted bootstrap so `Menu.setApplicationMenu(...)` always clears the application menu in the Linux conversion. A rebuilt app screenshot confirmed the default menu bar was removed while startup still reached `ready-to-show` and the Codex CLI connected.
+
+## Linux Visual Smoke Test: Hyprland Resize Gap
+
+On Hyprland/Wayland, the app could tile to a larger native window while the renderer stayed at its original viewport size. DevTools confirmed the bad case reported `innerWidth=1024` and `innerHeight=680` even though Hyprland had tiled the window to a taller area, leaving transparent wallpaper visible below the onboarding surface.
+
+Forcing Xwayland fixed the resize path. With the launcher passing `--ozone-platform=x11` plus `--force-device-scale-factor=2` on the focused 2x Hyprland monitor, DevTools reported `innerWidth=788`, `innerHeight=960`, `devicePixelRatio=2`, matching the tiled window. A screenshot confirmed the onboarding surface filled the window with no transparent bottom gap.
+
+The launcher now defaults `CODEX_ELECTRON_OZONE_PLATFORM` to `x11`, detects the focused Hyprland monitor scale via `hyprctl monitors`, and passes `--force-device-scale-factor` when the detected scale is not 1. Set `CODEX_ELECTRON_OZONE_PLATFORM` or `CODEX_ELECTRON_SCALE_FACTOR` to override this behavior during future smoke tests.
+
 ## Critical Obstacle: Build Flavor
 
 After packaged mode worked, the app still needed production metadata. Without explicit environment, logs showed missing build flavor metadata and fallback behavior.
@@ -203,13 +221,7 @@ Desktop: Hyprland
 Session: wayland
 ```
 
-The generated launcher sets:
-
-```bash
-ELECTRON_OZONE_PLATFORM_HINT=auto
-```
-
-Wayland warnings appeared during startup, but they were non-fatal. The main window reached `ready-to-show`.
+Native Wayland startup reached `ready-to-show`, but visual testing showed a renderer resize mismatch under Hyprland tiling. Prefer the generated launcher's default Xwayland path for visual smoke tests unless specifically investigating native Wayland behavior.
 
 Do not use `--disable-gpu` for smoke testing. That caused an avoidable GPU-access error from app/Sentry GPU info collection. A normal launch without that flag worked.
 

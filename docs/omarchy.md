@@ -50,16 +50,18 @@ node scripts/build-linux-app.mjs --channel beta
 
 ## Hyprland / Wayland Notes
 
-Omarchy commonly runs Hyprland. The generated launcher defaults `ELECTRON_OZONE_PLATFORM_HINT=auto`. If windows or popups behave oddly, launch with:
+Omarchy commonly runs Hyprland. The generated launcher defaults to Xwayland because native Wayland can leave transparent underdraw when Hyprland tiles the Electron window larger than the renderer viewport. The launcher also detects the focused Hyprland monitor scale and passes `--force-device-scale-factor` when needed.
+
+To force native Wayland for investigation:
 
 ```bash
-ELECTRON_OZONE_PLATFORM_HINT=auto codex-linux
+CODEX_ELECTRON_OZONE_PLATFORM=wayland codex-linux
 ```
 
-If that is worse, force XWayland:
+To override scale detection:
 
 ```bash
-codex-linux --ozone-platform=x11
+CODEX_ELECTRON_SCALE_FACTOR=1.5 codex-linux
 ```
 
 ## Verify

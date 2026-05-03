@@ -296,12 +296,25 @@ node scripts/check-upstream.mjs --compare data/upstream.json
 
 The next best improvements are:
 
-1. Make `codex-linux` prefer a stable CLI install over transient `npx` cache paths.
-2. Add a pacman package builder for Omarchy, still built locally from official upstream.
-3. Add icon extraction from `electron.icns` into PNG desktop icons.
-4. Add a local update command that rebuilds when `scripts/check-upstream.mjs` detects appcast drift.
-5. Improve beta-channel install support in `scripts/install-local.sh`.
-6. Add a focused smoke-test script that launches with an isolated `CODEX_ELECTRON_USER_DATA_PATH` and checks logs for `ready-to-show` plus CLI connection.
+1. Add a pacman package builder for Omarchy, still built locally from official upstream.
+2. Add icon extraction from `electron.icns` into PNG desktop icons.
+3. Add a local update command that rebuilds when `scripts/check-upstream.mjs` detects appcast drift.
+4. Improve beta-channel install support in `scripts/install-local.sh`.
+5. Add a focused smoke-test script that launches with an isolated `CODEX_ELECTRON_USER_DATA_PATH` and checks logs for `ready-to-show` plus CLI connection.
+
+## Agent Guidance Update
+
+On 2026-05-03, `AGENTS.md` was narrowed from "read this project history before every session" to "read it before making repository changes." This keeps the project memory active for code, script, documentation, packaging, and workflow edits without forcing simple questions or status checks to load and update the history document.
+
+Future agents should still append concise durable discoveries after repository-changing sessions, especially when the work affects the Linux build pipeline, appcast update flow, Electron runtime behavior, native module rebuilds, or Omarchy/Hyprland launch behavior.
+
+## Omarchy Codex CLI Package Note
+
+On 2026-05-03, local inspection showed Omarchy / Arch has `openai-codex` in pacman `extra`, installing the stable CLI at `/usr/bin/codex`. This machine also had an older Omarchy-generated `~/.local/bin/codex` wrapper from `omarchy-npx-install` that executed `npx --yes @openai/codex`; because Omarchy prepends `~/.local/bin`, fresh shells resolved `codex` to the npx wrapper instead of the pacman package. Moving that wrapper aside made clean login and interactive shells resolve `codex` to `/usr/bin/codex`.
+
+The generated launcher now prefers `/usr/bin/codex` when present and executable on Omarchy / Arch, then rejects or warns on `/.npm/_npx/` paths and local npx wrappers. The Omarchy quickstart installs `openai-codex` with pacman instead of installing the CLI through npm.
+
+On 2026-05-03, PR review identified one remaining mixed-PATH edge case: after the preferred stable locations, a single `command -v codex` fallback could stop on an unstable npx wrapper even when a stable custom-prefix CLI appeared later on `PATH`. The generated launcher now scans all executable `codex` matches reported by Bash `type -P -a` and selects the first non-unstable candidate.
 
 ## Lesson For Future Agentic Work
 

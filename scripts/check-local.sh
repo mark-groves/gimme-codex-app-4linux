@@ -6,8 +6,16 @@ check_command() {
   if command -v "$name" >/dev/null 2>&1; then
     local path
     path="$(command -v "$name")"
-    if [ "$name" = "codex" ] && [[ "$path" == *"/.npm/_npx/"* ]]; then
-      printf '%-18s %s (transient npx cache)\n' "$name" "$path"
+    if [ "$name" = "codex" ]; then
+      if [[ "$path" == *"/.npm/_npx/"* ]]; then
+        printf '%-18s %s (transient npx cache)\n' "$name" "$path"
+      elif [ -f "$path" ] && head -n 8 "$path" 2>/dev/null | grep -Eq 'npx .*@openai/codex|@openai/codex.*npx'; then
+        printf '%-18s %s (npx wrapper)\n' "$name" "$path"
+      elif command -v pacman >/dev/null 2>&1 && pacman -Qo "$path" >/dev/null 2>&1; then
+        printf '%-18s %s (%s)\n' "$name" "$path" "$(pacman -Qo "$path" 2>/dev/null)"
+      else
+        printf '%-18s %s\n' "$name" "$path"
+      fi
     else
       printf '%-18s %s\n' "$name" "$path"
     fi

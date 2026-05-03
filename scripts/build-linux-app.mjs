@@ -367,14 +367,56 @@ set -Eeuo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
-if [ -z "\${CODEX_CLI_PATH:-}" ]; then
-  if command -v codex >/dev/null 2>&1; then
-    export CODEX_CLI_PATH="$(command -v codex)"
-  else
-    printf 'Codex CLI not found. Install it with: npm i -g @openai/codex\\n' >&2
-    exit 1
+is_unstable_codex_cli() {
+  local candidate="$1"
+
+  case "$candidate" in
+    *"/.npm/_npx/"*) return 0 ;;
+  esac
+
+  if [ -f "$candidate" ] && head -n 8 "$candidate" 2>/dev/null | grep -Eq 'npx .*@openai/codex|@openai/codex.*npx'; then
+    return 0
   fi
-fi
+
+  return 1
+}
+
+resolve_codex_cli() {
+  if [ -n "\${CODEX_CLI_PATH:-}" ]; then
+    if [ -x "$CODEX_CLI_PATH" ]; then
+      printf '%s\\n' "$CODEX_CLI_PATH"
+      return 0
+    fi
+
+    printf 'CODEX_CLI_PATH is set but not executable: %s\\n' "$CODEX_CLI_PATH" >&2
+    return 1
+  fi
+
+  local candidate
+  for candidate in /usr/bin/codex /usr/local/bin/codex "$HOME/.local/bin/codex"; do
+    if [ -x "$candidate" ] && ! is_unstable_codex_cli "$candidate"; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+
+  while IFS= read -r candidate; do
+    if ! is_unstable_codex_cli "$candidate"; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+
+    printf 'Ignoring unstable Codex CLI path: %s\\n' "$candidate" >&2
+  done < <(type -P -a codex 2>/dev/null || true)
+
+  printf 'Codex CLI not found in a stable location.\\n' >&2
+  printf 'On Omarchy / Arch, install it with: sudo pacman -S openai-codex\\n' >&2
+  printf 'Or install the official npm package into a stable prefix: npm i -g @openai/codex\\n' >&2
+  return 1
+}
+
+CODEX_CLI_PATH="$(resolve_codex_cli)" || exit 1
+export CODEX_CLI_PATH
 
 export CODEX_ELECTRON_RESOURCES_PATH="\${CODEX_ELECTRON_RESOURCES_PATH:-$here/resources}"
 export BUILD_FLAVOR="\${BUILD_FLAVOR:-${buildFlavor}}"

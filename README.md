@@ -26,9 +26,17 @@ Manual equivalent:
 
 ```bash
 sudo pacman -S --needed nodejs npm base-devel git curl p7zip unzip zstd python openai-codex
+make update
+codex-linux
+```
+
+`make update` is the normal local update path. It checks the live production appcast, rebuilds the converted Linux app only when prod has changed or the matching local build is missing, refreshes the user-local launcher/desktop/icon install, and updates [data/upstream.json](data/upstream.json) only after a successful build and install.
+
+To force the manual build/install steps:
+
+```bash
 node scripts/build-linux-app.mjs --channel prod
 bash scripts/install-local.sh
-codex-linux
 ```
 
 To build a local pacman package instead of installing the lightweight user symlink:

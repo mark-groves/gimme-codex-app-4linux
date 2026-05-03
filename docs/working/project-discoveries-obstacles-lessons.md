@@ -1,6 +1,6 @@
 # Project Discoveries, Obstacles, And Lessons Learned
 
-Last updated: 2026-05-03.
+Last updated: 2026-05-04.
 
 This document records how this repo moved from "can we run the Codex desktop app on Omarchy?" to a working local Linux build pipeline. It is written for future maintainers and agents so they can understand the reasoning, avoid old traps, and continue from the current state instead of rediscovering everything.
 
@@ -70,6 +70,11 @@ scripts/lib/asar.mjs
 scripts/extract-asar.mjs
 scripts/install-local.sh
 scripts/omarchy-quickstart.sh
+scripts/update-local.mjs
+scripts/build-pacman-package.sh
+scripts/smoke-test.sh
+scripts/check-local.sh
+scripts/check-upstream.mjs
 ```
 
 The builder output looks like:
@@ -78,8 +83,12 @@ The builder output looks like:
 dist/codex-linux-prod-26.429.30905/
   codex-linux
   codex-electron
+  codex-linux.desktop
+  README-linux-build.txt
   resources/
     app/
+    electron.icns
+    icons/hicolor/
     plugins/
     codex-linux-build.json
 ```
@@ -194,13 +203,15 @@ The app's own Sparkle updater is macOS-only and remains disabled on Linux.
 
 The desktop app talks to a local app server by spawning the Codex CLI. On Linux, the converted app must be pointed at the Linux CLI.
 
-The launcher sets `CODEX_CLI_PATH` when it can find `codex` on `PATH`:
+The launcher resolves `CODEX_CLI_PATH` before starting Electron. It first honors an executable user-provided `CODEX_CLI_PATH`, then prefers stable locations such as:
 
-```bash
-export CODEX_CLI_PATH="$(command -v codex)"
+```text
+/usr/bin/codex
+/usr/local/bin/codex
+$HOME/.local/bin/codex
 ```
 
-Smoke testing confirmed that the app spawned the CLI and completed the initial handshake.
+After checking those stable locations, it scans all executable `codex` matches from Bash `type -P -a` and selects the first candidate that is not an unstable `npx` wrapper or transient `/.npm/_npx/` cache path. Smoke testing confirmed that the app spawned the CLI and completed the initial handshake.
 
 One remaining local-machine caveat: during this work, `codex` resolved to a transient `npx` cache path:
 
@@ -208,7 +219,7 @@ One remaining local-machine caveat: during this work, `codex` resolved to a tran
 /home/grovr/.npm/_npx/.../node_modules/.bin/codex
 ```
 
-That works but is not ideal. Future hardening should make the launcher prefer a stable CLI path, or install `@openai/codex` into a durable prefix.
+That worked during early testing but is not ideal; the generated launcher now rejects or warns on that class of path.
 
 ## Omarchy / Hyprland Notes
 
@@ -371,3 +382,11 @@ On 2026-05-03, `scripts/update-local.mjs` added the v1 `make update` workflow. I
 On 2026-05-03, PR review found `scripts/install-local.sh --build-dir <relative-path>` wrote the relative path directly into `~/.local/bin/codex-linux`, making the symlink resolve relative to `~/.local/bin` instead of the caller's working directory. The installer now canonicalizes the selected build directory before validating launcher and desktop-entry paths or creating the symlink. Keep user-supplied installer build paths absolute before writing installed links.
 
 On 2026-05-04, PR review found an appcast double-fetch race in `make update`: `scripts/update-local.mjs` read prod metadata before rebuild, while `scripts/build-linux-app.mjs` fetched appcast metadata again during rebuild. If prod advanced between those reads, the builder could produce a newer `dist/codex-linux-prod-<version>` than the updater later validated. The updater now refreshes live metadata after rebuild, recomputes the exact prod target from that refreshed response, retries once if the refreshed target is still stale, installs that refreshed build, and writes `data/upstream.json` from the same refreshed metadata only after install succeeds.
+
+## Documentation Alignment Check
+
+On 2026-05-03, a docs audit compared README and docs against the current scripts, local prod build metadata, pacman package output, live appcasts, and official Codex docs. Live prod and beta appcasts still matched `data/upstream.json`; official Codex app docs still listed macOS and Windows app downloads with Linux notification, while official CLI docs still listed Linux support and npm installation.
+
+The audit updated docs for the current output contract, `make update`, `make check`, local diagnostics, smoke testing, beta build limitations, generated desktop/icon/package behavior, and the Linux-specific app patches that clear Electron's default menu and make primary/secondary windows opaque. Keep future docs tied to script behavior rather than inferred behavior from generated artifacts.
+
+On 2026-05-04, a follow-up documentation audit verified live prod and beta appcasts still matched `data/upstream.json`, checked the official Codex app and CLI docs again, and aligned README, research notes, Omarchy guidance, and this project history with the current script behavior. The main durable correction was to describe the current stable Codex CLI resolution path instead of the older single `command -v codex` behavior.

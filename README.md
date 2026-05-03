@@ -2,7 +2,7 @@
 
 This repo builds a local Linux version of the OpenAI Codex desktop app, with Omarchy / Arch as the primary target.
 
-As of 2026-05-03, OpenAI's official Codex app downloads are for macOS and Windows. The official docs show a Linux notification signup, not a Linux build. The Codex CLI is officially available on Linux.
+As of 2026-05-04, OpenAI's official Codex app downloads are for macOS and Windows. The official docs show a Linux notification signup, not a Linux build. The Codex CLI is officially available on Linux.
 
 This repo does not use AUR packages, third-party repacks, or third-party Linux binaries. It downloads OpenAI's official macOS app archive, extracts the Electron app, pairs it with the matching official Electron Linux runtime, rebuilds native modules locally, and creates a local launcher.
 
@@ -22,7 +22,7 @@ That script:
 6. Rebuilds `better-sqlite3` and `node-pty` locally for Electron/Linux.
 7. Installs a `codex-linux` symlink, desktop entry, and hicolor desktop icons.
 
-Manual equivalent:
+Recommended manual path:
 
 ```bash
 sudo pacman -S --needed nodejs npm base-devel git curl p7zip unzip zstd python openai-codex
@@ -32,7 +32,7 @@ codex-linux
 
 `make update` is the normal local update path. It checks the live production appcast, rebuilds the converted Linux app only when prod has changed or the matching local build is missing, refreshes the user-local launcher/desktop/icon install, and updates [data/upstream.json](data/upstream.json) only after a successful build and install.
 
-To force the manual build/install steps:
+To mirror the quickstart script's lower-level build/install steps:
 
 ```bash
 node scripts/build-linux-app.mjs --channel prod
@@ -72,9 +72,15 @@ Check the current upstream appcast metadata:
 node scripts/check-upstream.mjs
 ```
 
-The tracked snapshot lives in [data/upstream.json](data/upstream.json), and the scheduled GitHub workflow in [.github/workflows/upstream-watch.yml](.github/workflows/upstream-watch.yml) flags appcast drift every 6 hours.
+The tracked snapshot lives in [data/upstream.json](data/upstream.json). Compare live appcasts against it with:
 
-Verified on 2026-05-03:
+```bash
+node scripts/check-upstream.mjs --compare data/upstream.json
+```
+
+The scheduled GitHub workflow in [.github/workflows/upstream-watch.yml](.github/workflows/upstream-watch.yml) runs that comparison every 6 hours and uploads the live metadata as an artifact.
+
+Verified on 2026-05-04:
 
 - production appcast: `26.429.30905`, published 2026-05-01, build `2345`
 - beta appcast: `26.429.21146`, published 2026-04-30, build `2317`
@@ -85,10 +91,28 @@ Generated output is local-only and ignored by git:
 
 - `dist/codex-linux-prod-<version>/codex-linux`: launcher that sets Omarchy/Wayland and Codex CLI environment.
 - `dist/codex-linux-prod-<version>/codex-electron`: renamed Linux Electron runtime so Electron treats the app as packaged.
+- `dist/codex-linux-prod-<version>/codex-linux.desktop`: generated user-local desktop entry.
+- `dist/codex-linux-prod-<version>/README-linux-build.txt`: short local launch note.
 - `dist/codex-linux-prod-<version>/resources/app`: extracted Codex Electron app.
+- `dist/codex-linux-prod-<version>/resources/electron.icns`: upstream icon source copied from the macOS bundle.
 - `dist/codex-linux-prod-<version>/resources/icons/hicolor`: desktop PNG icons extracted from the upstream `electron.icns`.
+- `dist/codex-linux-prod-<version>/resources/plugins`: bundled plugin resources copied from the upstream app.
 - `dist/codex-linux-prod-<version>/resources/codex-linux-build.json`: source URL, appcast build, SHA-256, Electron version, and target platform.
 - `dist/pacman/codex-linux-<version>.<build>-1-x86_64.pkg.tar.zst`: optional local Arch package built from the prod output.
+
+## Maintenance Checks
+
+Run non-graphical checks before committing script or doc changes:
+
+```bash
+make check
+```
+
+Run environment diagnostics when debugging local installs:
+
+```bash
+make local-diagnostics
+```
 
 ## Docs
 

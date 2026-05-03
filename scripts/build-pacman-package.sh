@@ -74,7 +74,7 @@ if [ -z "$build_dir" ]; then
   if [ -d "$repo_root/dist" ]; then
     build_dir="$(
       find "$repo_root/dist" -maxdepth 1 -type d -name 'codex-linux-prod-*' 2>/dev/null \
-        | sort \
+        | LC_ALL=C sort -V \
         | tail -n 1
     )"
   fi

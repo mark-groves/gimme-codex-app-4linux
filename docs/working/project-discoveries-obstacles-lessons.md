@@ -327,3 +327,15 @@ The biggest lesson is that this problem was not solved by finding "a Linux build
 - Wayland-compatible launch defaults
 
 For future agents: inspect the artifact first, then build the smallest owned pipeline around the facts found in the artifact. External projects can be useful signals, but they should not become the architecture unless the user explicitly wants that dependency.
+
+## Focused Smoke Test Script
+
+On 2026-05-03, `scripts/smoke-test.sh` was added to make the manual visual launch checks repeatable. It selects the newest `dist/codex-linux-*` build by default, launches `codex-linux` with an isolated temporary `CODEX_ELECTRON_USER_DATA_PATH`, captures logs, waits for `ready-to-show`, and confirms either `Codex CLI initialized` or `app_server_connection.state_changed ... next=connected`.
+
+The target is intentionally a manual `make smoke-test` workflow, not part of `make check`, because it requires a live graphical session. A local run against `dist/codex-linux-prod-26.429.30905` passed on 2026-05-03.
+
+On 2026-05-03, PR review found the smoke-test CLI preflight did not accept the launcher-supported `CODEX_CLI_PATH` configuration before checking fallback locations. The smoke test now treats an executable `CODEX_CLI_PATH` as sufficient, matching the generated launcher's supported stable CLI override.
+
+On 2026-05-03, a follow-up review found the smoke-test preflight still missed the launcher's `$HOME/.local/bin/codex` fallback when that directory is not on `PATH`. Keep manual smoke-test CLI preflight checks aligned with `resolve_codex_cli` so supported launcher configurations are not rejected before launch.
+
+On 2026-05-03, another review found `scripts/smoke-test.sh` could abort during default build discovery when `dist/` does not exist because the `find | sort | awk` command substitution runs under `set -e -o pipefail`. The script now checks for `dist/` before running discovery so first-run users reach the explicit "No converted build found" guidance.

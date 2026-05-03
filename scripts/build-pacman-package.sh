@@ -109,7 +109,9 @@ source_url="$(read_metadata source.url)" || fail "metadata does not contain sour
 pkgver="${package_version}.${appcast_build}"
 
 case "$pkgver" in
-  *[!A-Za-z0-9._+~-]*|'') fail "metadata produced invalid pkgver: $pkgver" ;;
+  *[!A-Za-z0-9._+~]*|'')
+    fail "metadata produced invalid Arch pkgver: $pkgver (pkgver may contain only ASCII letters, digits, '.', '_', '+', and '~'; it cannot contain hyphen, colon, slash, whitespace, or non-ASCII characters)"
+    ;;
 esac
 
 rm -rf "$package_root"

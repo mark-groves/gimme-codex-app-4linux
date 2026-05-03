@@ -7,7 +7,9 @@ check:
 	node --check scripts/extract-asar.mjs
 	node --check scripts/lib/asar.mjs
 	node --check scripts/update-local.mjs
+	node --check scripts/test-update-local.mjs
 	bash scripts/test-install-local.sh
+	node scripts/test-update-local.mjs
 
 build:
 	node scripts/build-linux-app.mjs --channel prod

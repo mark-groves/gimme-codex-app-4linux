@@ -9,48 +9,62 @@ const rootDir = path.resolve(import.meta.dirname, "..");
 const snapshotPath = path.resolve(rootDir, options.snapshot);
 const distDir = path.resolve(rootDir, options.distDir);
 const cacheDir = path.resolve(rootDir, options.cacheDir);
-
-const live = await fetchLiveMetadata();
-const liveProd = live.prod?.latest;
-if (!liveProd?.version || !liveProd?.build) {
-  throw new Error("live appcast metadata is missing prod.latest.version or prod.latest.build");
-}
+const maxBuildAttempts = 2;
 
 const snapshot = await readJson(snapshotPath);
-const snapshotProd = snapshot.prod?.latest;
-const snapshotDrifted =
-  snapshotProd?.version !== liveProd.version || snapshotProd?.build !== liveProd.build;
+let state = await resolveUpdateState(await fetchLiveMetadata(), snapshot);
 
-const targetBuildDir = path.join(distDir, `codex-linux-prod-${liveProd.version}`);
-let targetBuildValid = await hasMatchingBuild(targetBuildDir, liveProd);
+if (state.snapshotDrifted || !state.targetBuildValid) {
+  for (let attempt = 1; attempt <= maxBuildAttempts; attempt += 1) {
+    const reason = attempt === 1 ? buildReason(state) : "refreshed prod appcast target missing or stale";
+    console.log(`Building prod app (${reason})...`);
+    await run("node", [
+      "scripts/build-linux-app.mjs",
+      "--channel",
+      "prod",
+      "--cache-dir",
+      path.relative(rootDir, cacheDir) || ".",
+      "--dist-dir",
+      path.relative(rootDir, distDir) || ".",
+    ]);
 
-if (snapshotDrifted || !targetBuildValid) {
-  const reason = snapshotDrifted ? "prod appcast drift detected" : "matching prod build missing or stale";
-  console.log(`Building prod app (${reason})...`);
-  await run("node", [
-    "scripts/build-linux-app.mjs",
-    "--channel",
-    "prod",
-    "--cache-dir",
-    path.relative(rootDir, cacheDir) || ".",
-    "--dist-dir",
-    path.relative(rootDir, distDir) || ".",
-  ]);
-  targetBuildValid = await hasMatchingBuild(targetBuildDir, liveProd);
+    state = await resolveUpdateState(await fetchLiveMetadata(), snapshot);
+    if (state.targetBuildValid) {
+      break;
+    }
+  }
 }
 
-if (!targetBuildValid) {
-  throw new Error(`prod build is missing or stale after build: ${targetBuildDir}`);
+if (!state.targetBuildValid) {
+  throw new Error(`prod build is missing or stale after ${maxBuildAttempts} build attempts: ${state.targetBuildDir}`);
 }
 
-console.log(`Installing prod app from ${targetBuildDir}...`);
-await run("bash", ["scripts/install-local.sh", "--build-dir", targetBuildDir]);
+console.log(`Installing prod app from ${state.targetBuildDir}...`);
+await run("bash", ["scripts/install-local.sh", "--build-dir", state.targetBuildDir]);
 
-if (snapshotDrifted) {
-  await writeJsonAtomic(snapshotPath, live);
+if (state.snapshotDrifted) {
+  await writeJsonAtomic(snapshotPath, state.live);
   console.log(`Updated upstream snapshot: ${snapshotPath}`);
 } else {
   console.log("Upstream snapshot already matches live prod appcast.");
+}
+
+async function resolveUpdateState(live, snapshot) {
+  const liveProd = live.prod?.latest;
+  if (!liveProd?.version || !liveProd?.build) {
+    throw new Error("live appcast metadata is missing prod.latest.version or prod.latest.build");
+  }
+
+  const snapshotProd = snapshot.prod?.latest;
+  const snapshotDrifted =
+    snapshotProd?.version !== liveProd.version || snapshotProd?.build !== liveProd.build;
+  const targetBuildDir = path.join(distDir, `codex-linux-prod-${liveProd.version}`);
+  const targetBuildValid = await hasMatchingBuild(targetBuildDir, liveProd);
+  return { live, liveProd, snapshotDrifted, targetBuildDir, targetBuildValid };
+}
+
+function buildReason(state) {
+  return state.snapshotDrifted ? "prod appcast drift detected" : "matching prod build missing or stale";
 }
 
 async function fetchLiveMetadata() {
@@ -66,7 +80,7 @@ async function hasMatchingBuild(buildDir, liveProdMetadata) {
   const metadataPath = path.join(buildDir, "resources", "codex-linux-build.json");
   try {
     const metadata = await readJson(metadataPath);
-    return metadata.source?.build === liveProdMetadata.build;
+    return metadata.source?.version === liveProdMetadata.version && metadata.source?.build === liveProdMetadata.build;
   } catch (error) {
     if (error.code === "ENOENT") {
       return false;

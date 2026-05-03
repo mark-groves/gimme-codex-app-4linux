@@ -1,6 +1,6 @@
 # Research Notes
 
-Last checked: 2026-05-03.
+Last checked: 2026-05-04.
 
 ## Official State
 
@@ -21,7 +21,7 @@ https://persistent.oaistatic.com/codex-app-prod/appcast.xml
 https://persistent.oaistatic.com/codex-app-beta/appcast.xml
 ```
 
-Verified on 2026-05-03:
+Verified on 2026-05-04:
 
 | Channel | Version | Build | Published | Archive |
 | --- | --- | --- | --- | --- |
@@ -45,8 +45,10 @@ The local Linux builder:
 1. Extracts `app.asar` with `scripts/lib/asar.mjs`.
 2. Downloads official `electron@41.2.0` for Linux through npm.
 3. Renames the runtime binary to `codex-electron`, which makes `app.isPackaged` true.
-4. Rebuilds `better-sqlite3` and `node-pty` with `@electron/rebuild`.
-5. Launches with `BUILD_FLAVOR=prod`, `NODE_ENV=production`, and `CODEX_CLI_PATH`.
+4. Applies Linux runtime patches to remove Electron's default Linux menu bar and make primary/secondary windows opaque.
+5. Rebuilds `better-sqlite3` and `node-pty` with `@electron/rebuild`.
+6. Launches with `BUILD_FLAVOR=prod`, `NODE_ENV=production`, `CODEX_BUILD_NUMBER`, and `CODEX_CLI_PATH`.
+7. Defaults to Xwayland on Hyprland via `CODEX_ELECTRON_OZONE_PLATFORM=x11`, with focused-monitor scale detection unless overridden.
 
 ## Smoke Result
 

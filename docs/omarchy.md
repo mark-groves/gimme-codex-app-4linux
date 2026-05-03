@@ -19,21 +19,10 @@ codex-linux
 Install prerequisites:
 
 ```bash
-sudo pacman -S --needed nodejs npm base-devel git curl p7zip unzip zstd python
+sudo pacman -S --needed nodejs npm base-devel git curl p7zip unzip zstd python openai-codex
 ```
 
-Install the official Codex CLI:
-
-```bash
-npm i -g @openai/codex
-```
-
-If that fails because npm's global prefix is not writable:
-
-```bash
-npm i -g --prefix ~/.local @openai/codex
-export PATH="$HOME/.local/bin:$PATH"
-```
+On Omarchy / Arch, `openai-codex` installs the stable Codex CLI at `/usr/bin/codex`. The generated app launcher prefers that pacman-managed binary, even if an older `~/.local/bin/codex` npx wrapper appears earlier on `PATH`.
 
 Build and install the local launcher:
 
@@ -74,6 +63,6 @@ command -v codex-linux
 If the app cannot find the CLI:
 
 ```bash
-export CODEX_CLI_PATH="$(command -v codex)"
+export CODEX_CLI_PATH=/usr/bin/codex
 codex-linux
 ```

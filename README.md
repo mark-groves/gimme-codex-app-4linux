@@ -25,18 +25,16 @@ That script:
 Manual equivalent:
 
 ```bash
-sudo pacman -S --needed nodejs npm base-devel git curl p7zip unzip zstd python
-npm i -g @openai/codex
+sudo pacman -S --needed nodejs npm base-devel git curl p7zip unzip zstd python openai-codex
 node scripts/build-linux-app.mjs --channel prod
 bash scripts/install-local.sh
 codex-linux
 ```
 
-If global npm installs are not writable:
+On Omarchy / Arch, `openai-codex` installs the stable CLI at `/usr/bin/codex`. The generated launcher prefers that pacman-managed binary over older `npx` wrappers or transient npm cache paths. If you are not on Arch, install the official CLI into a stable location:
 
 ```bash
-npm i -g --prefix ~/.local @openai/codex
-export PATH="$HOME/.local/bin:$PATH"
+npm i -g @openai/codex
 ```
 
 ## Current Upstream

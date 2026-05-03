@@ -280,6 +280,49 @@ async function patchExtractedApp({ appDir, channel, latest, packageJson }) {
   delete nextPackageJson.scripts;
   delete nextPackageJson.devDependencies;
   await fs.writeFile(path.join(appDir, "package.json"), `${JSON.stringify(nextPackageJson, null, 2)}\n`);
+  await hideDefaultLinuxApplicationMenu(appDir);
+  await makeLinuxAppWindowsOpaque(appDir);
+}
+
+async function hideDefaultLinuxApplicationMenu(appDir) {
+  const bootstrapPath = path.join(appDir, ".vite", "build", "bootstrap.js");
+  const bootstrap = await fs.readFile(bootstrapPath, "utf8");
+  const marker = "n.app.whenReady().then(async()=>{";
+  const replacement =
+    "n.Menu.setApplicationMenu=(e=>()=>e(null))(n.Menu.setApplicationMenu.bind(n.Menu)),n.Menu.setApplicationMenu(null),n.app.whenReady().then(async()=>{";
+  if (bootstrap.includes(replacement)) {
+    return;
+  }
+  if (!bootstrap.includes(marker)) {
+    throw new Error("could not find Electron bootstrap ready marker to hide the Linux application menu");
+  }
+  await fs.writeFile(bootstrapPath, bootstrap.replace(marker, replacement));
+}
+
+async function makeLinuxAppWindowsOpaque(appDir) {
+  const mainBuildPath = await findMainBuildPath(appDir);
+  const mainBuild = await fs.readFile(mainBuildPath, "utf8");
+  const marker =
+    "function PM({platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r}){return e===`win32`&&!jM(t)?";
+  const replacement =
+    "function PM({platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r}){return e===`linux`&&(t===`primary`||t===`secondary`)?{backgroundColor:r?fM:pM,backgroundMaterial:null}:e===`win32`&&!jM(t)?";
+  if (mainBuild.includes(replacement)) {
+    return;
+  }
+  if (!mainBuild.includes(marker)) {
+    throw new Error("could not find Electron background-color helper to make Linux app windows opaque");
+  }
+  await fs.writeFile(mainBuildPath, mainBuild.replace(marker, replacement));
+}
+
+async function findMainBuildPath(appDir) {
+  const buildDir = path.join(appDir, ".vite", "build");
+  const entries = await fs.readdir(buildDir);
+  const candidates = entries.filter(entry => /^main-.*\.js$/.test(entry));
+  if (candidates.length !== 1) {
+    throw new Error(`expected exactly one main build file, found ${candidates.length}`);
+  }
+  return path.join(buildDir, candidates[0]);
 }
 
 async function copyOptionalResources({ macResourcesDir, resourcesDir }) {
@@ -334,12 +377,44 @@ if [ -z "\${CODEX_CLI_PATH:-}" ]; then
 fi
 
 export CODEX_ELECTRON_RESOURCES_PATH="\${CODEX_ELECTRON_RESOURCES_PATH:-$here/resources}"
-export ELECTRON_OZONE_PLATFORM_HINT="\${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
 export BUILD_FLAVOR="\${BUILD_FLAVOR:-${buildFlavor}}"
 export CODEX_BUILD_NUMBER="\${CODEX_BUILD_NUMBER:-${buildNumber}}"
 export NODE_ENV="\${NODE_ENV:-production}"
 
-exec "$here/codex-electron" "$@"
+detect_hyprland_scale() {
+  if ! command -v hyprctl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  hyprctl monitors 2>/dev/null | awk '
+    /^Monitor / { scale = ""; focused = 0 }
+    /^[[:space:]]*scale:/ { scale = $2 }
+    /^[[:space:]]*focused:[[:space:]]*yes/ {
+      if (scale != "") {
+        print scale
+        exit
+      }
+    }
+  '
+}
+
+electron_args=()
+ozone_platform="\${CODEX_ELECTRON_OZONE_PLATFORM-x11}"
+if [ -n "$ozone_platform" ]; then
+  electron_args+=("--ozone-platform=$ozone_platform")
+fi
+
+scale_factor="\${CODEX_ELECTRON_SCALE_FACTOR-}"
+if [ -z "$scale_factor" ] && [ "$ozone_platform" = "x11" ]; then
+  scale_factor="$(detect_hyprland_scale || true)"
+fi
+
+case "$scale_factor" in
+  ""|"1"|"1.0"|"1.00") ;;
+  *) electron_args+=("--force-device-scale-factor=$scale_factor") ;;
+esac
+
+exec "$here/codex-electron" "\${electron_args[@]}" "$@"
 `;
   const launcherPath = path.join(outputDir, "codex-linux");
   await fs.writeFile(launcherPath, launcher);

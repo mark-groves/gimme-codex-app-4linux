@@ -296,11 +296,9 @@ node scripts/check-upstream.mjs --compare data/upstream.json
 
 The next best improvements are:
 
-1. Add a pacman package builder for Omarchy, still built locally from official upstream.
-2. Add icon extraction from `electron.icns` into PNG desktop icons.
-3. Add a local update command that rebuilds when `scripts/check-upstream.mjs` detects appcast drift.
-4. Improve beta-channel install support in `scripts/install-local.sh`.
-5. Add a focused smoke-test script that launches with an isolated `CODEX_ELECTRON_USER_DATA_PATH` and checks logs for `ready-to-show` plus CLI connection.
+1. Add icon extraction from `electron.icns` into PNG desktop icons.
+2. Add a local update command that rebuilds when `scripts/check-upstream.mjs` detects appcast drift.
+3. Improve beta-channel install support in `scripts/install-local.sh`.
 
 ## Agent Guidance Update
 
@@ -339,3 +337,15 @@ On 2026-05-03, PR review found the smoke-test CLI preflight did not accept the l
 On 2026-05-03, a follow-up review found the smoke-test preflight still missed the launcher's `$HOME/.local/bin/codex` fallback when that directory is not on `PATH`. Keep manual smoke-test CLI preflight checks aligned with `resolve_codex_cli` so supported launcher configurations are not rejected before launch.
 
 On 2026-05-03, another review found `scripts/smoke-test.sh` could abort during default build discovery when `dist/` does not exist because the `find | sort | awk` command substitution runs under `set -e -o pipefail`. The script now checks for `dist/` before running discovery so first-run users reach the explicit "No converted build found" guidance.
+
+## Local Pacman Package Builder
+
+On 2026-05-03, `scripts/build-pacman-package.sh` added a v1 local Arch/Omarchy package path for prod builds. It consumes the newest `dist/codex-linux-prod-*` output by default, generates a temporary `PKGBUILD` under `.cache/pacman/codex-linux/`, and writes `dist/pacman/codex-linux-<app version>.<appcast build>-1-x86_64.pkg.tar.zst`.
+
+The package installs the converted bundle to `/opt/codex-linux`, removes the build-directory desktop entry from that copy, adds a wrapper at `/usr/bin/codex-linux`, and registers `/usr/share/applications/codex-linux.desktop` with `Exec=/usr/bin/codex-linux %U`. The wrapper is intentional: a symlink can confuse launch/resource resolution because the app launcher relies on its executed path.
+
+The package declares `openai-codex`, `alsa-lib`, and Arch Electron 41's runtime library dependencies, but it does not depend on `electron41` because this repo packages the matching bundled Electron runtime from the converted app. The `PKGBUILD` uses `options=('!strip' '!debug')` so makepkg does not rewrite bundled Electron or rebuilt native-module binaries.
+
+On 2026-05-03, PR review found `scripts/build-pacman-package.sh` could abort during default prod build discovery when `dist/` does not exist because the `find | sort | tail` command substitution runs under `set -e -o pipefail`. The script now checks for `dist/` before running discovery so `make pacman-package` on a fresh checkout reaches the intended "no prod build found. Run: make build" guidance.
+
+On 2026-05-03, PR review found the pacman package builder assumed makepkg wrote the package into the temporary package root and left older copied packages in `dist/pacman/`. The script now captures `makepkg --packagelist` before building, resolves the reported package path after `makepkg` runs so configured `PKGDEST` is honored, and removes stale `codex-linux-*.pkg.tar*` outputs before copying the new package so the documented `pacman -U dist/pacman/codex-linux-*.pkg.tar.zst` glob has only one target.

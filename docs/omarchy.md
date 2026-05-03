@@ -31,6 +31,16 @@ node scripts/build-linux-app.mjs --channel prod
 bash scripts/install-local.sh
 ```
 
+Or build a local pacman package and install it explicitly:
+
+```bash
+make build
+make pacman-package
+sudo pacman -U dist/pacman/codex-linux-*.pkg.tar.zst
+```
+
+The package installs the app under `/opt/codex-linux`, adds `/usr/bin/codex-linux`, and registers a package-owned desktop entry. It deliberately packages the bundled Electron runtime from the converted app, so it depends on the Electron runtime libraries but not on Arch's `electron41` package.
+
 Beta channel:
 
 ```bash

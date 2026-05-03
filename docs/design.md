@@ -42,3 +42,13 @@ dist/codex-linux-prod-<version>/
 ```
 
 `resources/codex-linux-build.json` records provenance: appcast URL, source archive URL, SHA-256, source version, Electron version, and target platform.
+
+## Local Pacman Package
+
+```bash
+make pacman-package
+```
+
+The pacman package builder consumes the newest prod build in `dist/` by default and writes a local package to `dist/pacman/`. It generates a temporary `PKGBUILD` under `.cache/pacman/codex-linux/`, copies the converted bundle into `/opt/codex-linux`, installs a wrapper at `/usr/bin/codex-linux`, and writes a package-owned desktop entry with `Exec=/usr/bin/codex-linux %U`.
+
+The package uses `options=('!strip' '!debug')` because the converted app includes bundled Electron and rebuilt native module binaries. It declares the runtime library dependencies used by Arch's Electron 41 package plus `alsa-lib`, but it does not depend on `electron41`; the converted app carries its matching Electron runtime.

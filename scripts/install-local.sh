@@ -62,6 +62,8 @@ if [ ! -d "$build_dir" ]; then
   exit 1
 fi
 
+build_dir="$(cd -- "$build_dir" && pwd -P)"
+
 if [ ! -x "$build_dir/codex-linux" ]; then
   printf 'Build is missing executable launcher: %s\n' "$build_dir/codex-linux" >&2
   exit 1

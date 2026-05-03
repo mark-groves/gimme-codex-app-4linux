@@ -1,12 +1,13 @@
 .PHONY: build check install local-diagnostics omarchy-install pacman-package smoke-test update upstream
 
 check:
-	bash -n scripts/build-pacman-package.sh scripts/check-local.sh scripts/install-local.sh scripts/omarchy-quickstart.sh scripts/smoke-test.sh
+	bash -n scripts/build-pacman-package.sh scripts/check-local.sh scripts/install-local.sh scripts/omarchy-quickstart.sh scripts/smoke-test.sh scripts/test-install-local.sh
 	node --check scripts/check-upstream.mjs
 	node --check scripts/build-linux-app.mjs
 	node --check scripts/extract-asar.mjs
 	node --check scripts/lib/asar.mjs
 	node --check scripts/update-local.mjs
+	bash scripts/test-install-local.sh
 
 build:
 	node scripts/build-linux-app.mjs --channel prod

@@ -367,3 +367,5 @@ The generated desktop entry now uses `Icon=codex-linux`. The user-local installe
 ## Local Prod Update Command
 
 On 2026-05-03, `scripts/update-local.mjs` added the v1 `make update` workflow. It fetches live metadata through `scripts/check-upstream.mjs`, compares only `prod.latest.version` and `prod.latest.build` against `data/upstream.json`, rebuilds prod when drift is present or the matching `dist/codex-linux-prod-<version>/resources/codex-linux-build.json` is missing/stale, installs that exact build with `scripts/install-local.sh --build-dir`, and atomically rewrites `data/upstream.json` only after build/install succeeds.
+
+On 2026-05-03, PR review found `scripts/install-local.sh --build-dir <relative-path>` wrote the relative path directly into `~/.local/bin/codex-linux`, making the symlink resolve relative to `~/.local/bin` instead of the caller's working directory. The installer now canonicalizes the selected build directory before validating launcher and desktop-entry paths or creating the symlink. Keep user-supplied installer build paths absolute before writing installed links.

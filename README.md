@@ -20,7 +20,7 @@ That script:
 4. Extracts `app.asar` with this repo's own ASAR extractor.
 5. Downloads the matching Electron Linux runtime.
 6. Rebuilds `better-sqlite3` and `node-pty` locally for Electron/Linux.
-7. Installs a `codex-linux` symlink and desktop entry.
+7. Installs a `codex-linux` symlink, desktop entry, and hicolor desktop icons.
 
 Manual equivalent:
 
@@ -40,7 +40,7 @@ sudo pacman -U dist/pacman/codex-linux-*.pkg.tar.zst
 codex-linux
 ```
 
-The package is local and unofficial. It installs the converted app to `/opt/codex-linux`, exposes `/usr/bin/codex-linux`, and owns `/usr/share/applications/codex-linux.desktop`. It does not install automatically; use `sudo pacman -U` explicitly when you want the package on the system.
+The package is local and unofficial. It installs the converted app to `/opt/codex-linux`, exposes `/usr/bin/codex-linux`, and owns `/usr/share/applications/codex-linux.desktop` plus `/usr/share/icons/hicolor/.../apps/codex-linux.png`. It does not install automatically; use `sudo pacman -U` explicitly when you want the package on the system.
 
 Run a focused graphical smoke test against the newest build in `dist/`:
 
@@ -78,6 +78,7 @@ Generated output is local-only and ignored by git:
 - `dist/codex-linux-prod-<version>/codex-linux`: launcher that sets Omarchy/Wayland and Codex CLI environment.
 - `dist/codex-linux-prod-<version>/codex-electron`: renamed Linux Electron runtime so Electron treats the app as packaged.
 - `dist/codex-linux-prod-<version>/resources/app`: extracted Codex Electron app.
+- `dist/codex-linux-prod-<version>/resources/icons/hicolor`: desktop PNG icons extracted from the upstream `electron.icns`.
 - `dist/codex-linux-prod-<version>/resources/codex-linux-build.json`: source URL, appcast build, SHA-256, Electron version, and target platform.
 - `dist/pacman/codex-linux-<version>.<build>-1-x86_64.pkg.tar.zst`: optional local Arch package built from the prod output.
 

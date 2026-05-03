@@ -31,6 +31,8 @@ node scripts/build-linux-app.mjs --channel prod
 bash scripts/install-local.sh
 ```
 
+The local installer writes the desktop entry to `${XDG_DATA_HOME:-$HOME/.local/share}/applications` and installs the generated hicolor icons to `${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor`.
+
 Or build a local pacman package and install it explicitly:
 
 ```bash
@@ -39,7 +41,7 @@ make pacman-package
 sudo pacman -U dist/pacman/codex-linux-*.pkg.tar.zst
 ```
 
-The package installs the app under `/opt/codex-linux`, adds `/usr/bin/codex-linux`, and registers a package-owned desktop entry. It deliberately packages the bundled Electron runtime from the converted app, so it depends on the Electron runtime libraries but not on Arch's `electron41` package.
+The package installs the app under `/opt/codex-linux`, adds `/usr/bin/codex-linux`, and registers a package-owned desktop entry and hicolor icon set. It deliberately packages the bundled Electron runtime from the converted app, so it depends on the Electron runtime libraries but not on Arch's `electron41` package.
 
 Beta channel:
 

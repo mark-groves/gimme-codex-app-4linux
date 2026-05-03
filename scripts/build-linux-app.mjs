@@ -13,6 +13,58 @@ const channels = {
 };
 
 const nativeModules = ["better-sqlite3", "node-pty"];
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const icnsPngIconTypes = new Map([
+  ["ic04", { physicalSize: 16, outputs: [{ directory: "16x16", priority: 0 }] }],
+  ["icp4", { physicalSize: 16, outputs: [{ directory: "16x16", priority: 0 }] }],
+  ["ic05", { physicalSize: 32, outputs: [{ directory: "32x32", priority: 0 }] }],
+  ["icp5", { physicalSize: 32, outputs: [{ directory: "32x32", priority: 0 }] }],
+  ["icp6", { physicalSize: 64, outputs: [{ directory: "64x64", priority: 0 }] }],
+  ["ic07", { physicalSize: 128, outputs: [{ directory: "128x128", priority: 0 }] }],
+  ["ic08", { physicalSize: 256, outputs: [{ directory: "256x256", priority: 0 }] }],
+  ["ic09", { physicalSize: 512, outputs: [{ directory: "512x512", priority: 0 }] }],
+  [
+    "ic11",
+    {
+      physicalSize: 32,
+      outputs: [
+        { directory: "16x16@2", priority: 0 },
+        { directory: "32x32", priority: 1 },
+      ],
+    },
+  ],
+  [
+    "ic12",
+    {
+      physicalSize: 64,
+      outputs: [
+        { directory: "32x32@2", priority: 0 },
+        { directory: "64x64", priority: 1 },
+      ],
+    },
+  ],
+  [
+    "ic13",
+    {
+      physicalSize: 256,
+      outputs: [
+        { directory: "128x128@2", priority: 0 },
+        { directory: "256x256", priority: 1 },
+      ],
+    },
+  ],
+  [
+    "ic14",
+    {
+      physicalSize: 512,
+      outputs: [
+        { directory: "256x256@2", priority: 0 },
+        { directory: "512x512", priority: 1 },
+      ],
+    },
+  ],
+  ["ic10", { physicalSize: 1024, outputs: [{ directory: "512x512@2", priority: 0 }] }],
+]);
 
 const options = parseArgs(process.argv.slice(2));
 const rootDir = path.resolve(import.meta.dirname, "..");
@@ -334,6 +386,94 @@ async function copyOptionalResources({ macResourcesDir, resourcesDir }) {
   const iconPath = path.join(macResourcesDir, "electron.icns");
   if (!(await missing(iconPath))) {
     await fs.copyFile(iconPath, path.join(resourcesDir, "electron.icns"));
+    await extractIcnsPngIcons({
+      iconPath,
+      outputRoot: path.join(resourcesDir, "icons", "hicolor"),
+    });
+  }
+}
+
+async function extractIcnsPngIcons({ iconPath, outputRoot }) {
+  const buffer = await fs.readFile(iconPath);
+  const entries = parseIcnsPngEntries(buffer, iconPath);
+  if (entries.length === 0) {
+    throw new Error(`no usable PNG icon entries found in ${iconPath}`);
+  }
+
+  for (const entry of entries) {
+    const target = path.join(outputRoot, entry.directory, "apps", "codex-linux.png");
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, entry.payload);
+  }
+
+  console.log(`Extracted ${entries.length} desktop icon(s) from ${iconPath}`);
+}
+
+function parseIcnsPngEntries(buffer, iconPath) {
+  if (buffer.length < 8) {
+    throw new Error(`invalid ICNS file ${iconPath}: file is too small`);
+  }
+  if (buffer.subarray(0, 4).toString("ascii") !== "icns") {
+    throw new Error(`invalid ICNS file ${iconPath}: missing icns header`);
+  }
+
+  const declaredLength = buffer.readUInt32BE(4);
+  if (declaredLength < 8 || declaredLength > buffer.length) {
+    throw new Error(
+      `invalid ICNS file ${iconPath}: declared length ${declaredLength} exceeds file length ${buffer.length}`,
+    );
+  }
+
+  const entries = new Map();
+  let offset = 8;
+  while (offset < declaredLength) {
+    if (offset + 8 > declaredLength) {
+      throw new Error(`invalid ICNS file ${iconPath}: truncated entry header at offset ${offset}`);
+    }
+
+    const type = buffer.subarray(offset, offset + 4).toString("ascii");
+    const entryLength = buffer.readUInt32BE(offset + 4);
+    if (entryLength < 8 || offset + entryLength > declaredLength) {
+      throw new Error(`invalid ICNS file ${iconPath}: invalid ${type} entry length ${entryLength}`);
+    }
+
+    const icon = icnsPngIconTypes.get(type);
+    const payload = buffer.subarray(offset + 8, offset + entryLength);
+    if (icon && startsWithPngSignature(payload)) {
+      validatePngDimensions({ payload, icon, iconPath, type });
+      for (const output of icon.outputs) {
+        const current = entries.get(output.directory);
+        if (!current || output.priority < current.priority) {
+          entries.set(output.directory, { directory: output.directory, payload, priority: output.priority });
+        }
+      }
+    }
+
+    offset += entryLength;
+  }
+
+  if (offset !== declaredLength) {
+    throw new Error(`invalid ICNS file ${iconPath}: entry parsing ended at ${offset}, expected ${declaredLength}`);
+  }
+
+  return [...entries.values()].map(({ directory, payload }) => ({ directory, payload }));
+}
+
+function startsWithPngSignature(buffer) {
+  return buffer.length >= pngSignature.length && buffer.subarray(0, pngSignature.length).equals(pngSignature);
+}
+
+function validatePngDimensions({ payload, icon, iconPath, type }) {
+  if (payload.length < 24 || payload.subarray(12, 16).toString("ascii") !== "IHDR") {
+    throw new Error(`invalid PNG payload in ${iconPath}: ${type} has no IHDR chunk`);
+  }
+
+  const width = payload.readUInt32BE(16);
+  const height = payload.readUInt32BE(20);
+  if (width !== icon.physicalSize || height !== icon.physicalSize) {
+    throw new Error(
+      `unexpected PNG dimensions in ${iconPath}: ${type} expected ${icon.physicalSize}x${icon.physicalSize}, got ${width}x${height}`,
+    );
   }
 }
 
@@ -474,6 +614,7 @@ Comment=OpenAI Codex desktop app converted locally for Linux
 Exec=${path.join(outputDir, "codex-linux")} %U
 Terminal=false
 Categories=Development;IDE;
+Icon=codex-linux
 MimeType=x-scheme-handler/codex;
 X-Codex-Linux-Version=${version}
 `;

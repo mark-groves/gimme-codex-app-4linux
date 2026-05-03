@@ -296,9 +296,8 @@ node scripts/check-upstream.mjs --compare data/upstream.json
 
 The next best improvements are:
 
-1. Add icon extraction from `electron.icns` into PNG desktop icons.
-2. Add a local update command that rebuilds when `scripts/check-upstream.mjs` detects appcast drift.
-3. Improve beta-channel install support in `scripts/install-local.sh`.
+1. Add a local update command that rebuilds when `scripts/check-upstream.mjs` detects appcast drift.
+2. Improve beta-channel install support in `scripts/install-local.sh`.
 
 ## Agent Guidance Update
 
@@ -353,3 +352,9 @@ On 2026-05-03, PR review found the pacman package builder assumed makepkg wrote 
 On 2026-05-03, PR review found newest prod build discovery used plain lexicographic ordering, which can choose an older build when version digit widths differ, such as `0.9` sorting after `0.10`. The pacman package builder and local installer now use `LC_ALL=C sort -V` for version-aware build selection.
 
 On 2026-05-03, PR review found the pacman package builder accepted hyphenated upstream app versions in the generated `pkgver`, but Arch `pkgver` cannot contain hyphens. The builder now fails early unless the composed version uses only ASCII letters, digits, `.`, `_`, `+`, and `~`; prerelease-style upstream versions such as `1.2.3-beta.1` must be handled deliberately instead of silently normalized.
+
+## Desktop Icon Extraction
+
+On 2026-05-03, the builder added a pure Node ICNS parser for `electron.icns`. It validates the `icns` header, declared file length, per-entry bounds, PNG signatures, and IHDR dimensions, then writes embedded PNG entries to `resources/icons/hicolor/<size>/apps/codex-linux.png`, including normal sizes and available `@2` directories. The build fails if `electron.icns` is present but contains no usable PNG entries.
+
+The generated desktop entry now uses `Icon=codex-linux`. The user-local installer respects `${XDG_DATA_HOME:-$HOME/.local/share}`, installs the desktop file and hicolor icon tree there, and refreshes the user hicolor cache when `gtk-update-icon-cache` is available. The pacman package installs the same icon tree under `/usr/share/icons/hicolor` and declares `hicolor-icon-theme`.

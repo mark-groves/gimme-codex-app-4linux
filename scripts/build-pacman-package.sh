@@ -130,6 +130,7 @@ url='https://github.com/openai/codex'
 license=('custom')
 depends=(
   'openai-codex'
+  'hicolor-icon-theme'
   'alsa-lib'
   'c-ares'
   'gcc-libs'
@@ -179,6 +180,11 @@ package() {
   rm -f "\$pkgdir/opt/codex-linux/codex-linux.desktop"
   rm -rf "\$pkgdir/opt/codex-linux/.cache"
 
+  if [ -d "\$pkgdir/opt/codex-linux/resources/icons/hicolor" ]; then
+    install -d "\$pkgdir/usr/share/icons/hicolor"
+    cp -a "\$pkgdir/opt/codex-linux/resources/icons/hicolor/." "\$pkgdir/usr/share/icons/hicolor/"
+  fi
+
   install -Dm755 /dev/stdin "\$pkgdir/usr/bin/codex-linux" <<'WRAPPER'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -193,6 +199,7 @@ Comment=OpenAI Codex desktop app converted locally for Linux
 Exec=/usr/bin/codex-linux %U
 Terminal=false
 Categories=Development;IDE;
+Icon=codex-linux
 MimeType=x-scheme-handler/codex;
 DESKTOP
 

@@ -18,9 +18,10 @@ Steps:
 6. Read the app's `package.json` to discover the Electron version.
 7. Install official Linux Electron for that version into `.cache/tools`.
 8. Extract the Electron app into `dist/codex-linux-<channel>-<version>/resources/app`.
-9. Rebuild native modules for Electron/Linux.
-10. Rename `electron` to `codex-electron` so Electron treats the app as packaged.
-11. Write `codex-linux`, a launcher that sets Linux-specific runtime environment.
+9. Extract embedded PNGs from `electron.icns` into freedesktop hicolor icon paths.
+10. Rebuild native modules for Electron/Linux.
+11. Rename `electron` to `codex-electron` so Electron treats the app as packaged.
+12. Write `codex-linux`, a launcher that sets Linux-specific runtime environment.
 
 ## Why Rename Electron
 
@@ -37,6 +38,7 @@ dist/codex-linux-prod-<version>/
   codex-linux
   codex-electron
   resources/app/
+  resources/icons/hicolor/
   resources/plugins/
   resources/codex-linux-build.json
 ```
@@ -49,6 +51,6 @@ dist/codex-linux-prod-<version>/
 make pacman-package
 ```
 
-The pacman package builder consumes the newest prod build in `dist/` by default and writes a local package to `dist/pacman/`. It generates a temporary `PKGBUILD` under `.cache/pacman/codex-linux/`, copies the converted bundle into `/opt/codex-linux`, installs a wrapper at `/usr/bin/codex-linux`, and writes a package-owned desktop entry with `Exec=/usr/bin/codex-linux %U`.
+The pacman package builder consumes the newest prod build in `dist/` by default and writes a local package to `dist/pacman/`. It generates a temporary `PKGBUILD` under `.cache/pacman/codex-linux/`, copies the converted bundle into `/opt/codex-linux`, installs a wrapper at `/usr/bin/codex-linux`, writes a package-owned desktop entry with `Exec=/usr/bin/codex-linux %U` and `Icon=codex-linux`, and installs the generated icons under `/usr/share/icons/hicolor`.
 
-The package uses `options=('!strip' '!debug')` because the converted app includes bundled Electron and rebuilt native module binaries. It declares the runtime library dependencies used by Arch's Electron 41 package plus `alsa-lib`, but it does not depend on `electron41`; the converted app carries its matching Electron runtime.
+The package uses `options=('!strip' '!debug')` because the converted app includes bundled Electron and rebuilt native module binaries. It declares the runtime library dependencies used by Arch's Electron 41 package plus `alsa-lib` and `hicolor-icon-theme`, but it does not depend on `electron41`; the converted app carries its matching Electron runtime.

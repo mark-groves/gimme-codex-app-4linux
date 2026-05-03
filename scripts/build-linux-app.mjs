@@ -400,15 +400,14 @@ resolve_codex_cli() {
     fi
   done
 
-  if command -v codex >/dev/null 2>&1; then
-    candidate="$(command -v codex)"
+  while IFS= read -r candidate; do
     if ! is_unstable_codex_cli "$candidate"; then
       printf '%s\\n' "$candidate"
       return 0
     fi
 
     printf 'Ignoring unstable Codex CLI path: %s\\n' "$candidate" >&2
-  fi
+  done < <(type -P -a codex 2>/dev/null || true)
 
   printf 'Codex CLI not found in a stable location.\\n' >&2
   printf 'On Omarchy / Arch, install it with: sudo pacman -S openai-codex\\n' >&2

@@ -314,6 +314,8 @@ On 2026-05-03, local inspection showed Omarchy / Arch has `openai-codex` in pacm
 
 The generated launcher now prefers `/usr/bin/codex` when present and executable on Omarchy / Arch, then rejects or warns on `/.npm/_npx/` paths and local npx wrappers. The Omarchy quickstart installs `openai-codex` with pacman instead of installing the CLI through npm.
 
+On 2026-05-03, PR review identified one remaining mixed-PATH edge case: after the preferred stable locations, a single `command -v codex` fallback could stop on an unstable npx wrapper even when a stable custom-prefix CLI appeared later on `PATH`. The generated launcher now scans all executable `codex` matches reported by Bash `type -P -a` and selects the first non-unstable candidate.
+
 ## Lesson For Future Agentic Work
 
 The biggest lesson is that this problem was not solved by finding "a Linux build." It was solved by reducing the macOS app to its portable Electron parts, then identifying the minimum platform-specific requirements:

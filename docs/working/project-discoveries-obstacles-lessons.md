@@ -1,6 +1,6 @@
 # Project Discoveries, Obstacles, And Lessons Learned
 
-Last updated: 2026-05-04.
+Last updated: 2026-05-05.
 
 This document records how this repo moved from "can we run the Codex desktop app on Omarchy?" to a working local Linux build pipeline. It is written for future maintainers and agents so they can understand the reasoning, avoid old traps, and continue from the current state instead of rediscovering everything.
 
@@ -394,3 +394,7 @@ On 2026-05-04, a follow-up documentation audit verified live prod and beta appca
 On 2026-05-04, settings investigation found the converted Electron app's Linux open-target registry exposed only the hidden `systemDefault` target plus no Linux editor or file-manager targets. That made Settings' `Open config.toml` depend on desktop MIME association for `.toml`, which is unreliable on Omarchy/Hyprland. The builder now patches the extracted main bundle to add Linux VS Code/Insiders detection, a generic GUI text-editor fallback, and an `xdg-open` file-manager target. `make check` and `make smoke-test` passed after rebuilding `dist/codex-linux-prod-26.429.30905`.
 
 The same investigation found app-server logs for reported Configuration changes showed successful `config/value/write` and follow-up `config/read` requests, and the Git PR icon toggle persisted to `~/.codex/.codex-global-state.json` despite the switch rendering stale until relaunch. Treat future "Unable to save" or unchanged Git toggle reports as likely renderer/query-state feedback problems unless app-server logs show actual write errors.
+
+On 2026-05-05, follow-up settings triage found the Configuration page writes user config through the app server with the config layer's `expectedVersion`, while project config writes use the renderer-side `local-environment-config-save` path. If `~/.codex/config.toml` changes after the page's last `config/read`, for example from another Codex process updating marketplaces or global state, the next user-config save can surface "Unable to save" even though file permissions are correct and the desired value may already be present. Restarting/reloading the desktop app or editing `~/.codex/config.toml` directly works around this stale-version UI path.
+
+On 2026-05-05, the generated user-local prod desktop entry was aligned with the pacman package entry by using `Name=Codex` for `prod` builds, while keeping non-prod channels labeled, for example `Codex (beta)`. Future launcher label changes should preserve that distinction so the normal app grid entry is clean but beta installs remain visually identifiable.

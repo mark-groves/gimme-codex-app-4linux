@@ -662,9 +662,10 @@ exec "$here/codex-electron" "\${electron_args[@]}" "$@"
 }
 
 async function writeDesktopFile({ outputDir, channel, version }) {
+  const displayName = channel === "prod" ? "Codex" : `Codex (${channel})`;
   const desktopFile = `[Desktop Entry]
 Type=Application
-Name=Codex (${channel})
+Name=${displayName}
 Comment=OpenAI Codex desktop app converted locally for Linux
 Exec=${path.join(outputDir, "codex-linux")} %U
 Terminal=false

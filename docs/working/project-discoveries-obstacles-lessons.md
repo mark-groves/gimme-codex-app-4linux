@@ -1,6 +1,6 @@
 # Project Discoveries, Obstacles, And Lessons Learned
 
-Last updated: 2026-05-05.
+Last updated: 2026-05-06.
 
 This document records how this repo moved from "can we run the Codex desktop app on Omarchy?" to a working local Linux build pipeline. It is written for future maintainers and agents so they can understand the reasoning, avoid old traps, and continue from the current state instead of rediscovering everything.
 
@@ -382,6 +382,16 @@ On 2026-05-03, `scripts/update-local.mjs` added the v1 `make update` workflow. I
 On 2026-05-03, PR review found `scripts/install-local.sh --build-dir <relative-path>` wrote the relative path directly into `~/.local/bin/codex-linux`, making the symlink resolve relative to `~/.local/bin` instead of the caller's working directory. The installer now canonicalizes the selected build directory before validating launcher and desktop-entry paths or creating the symlink. Keep user-supplied installer build paths absolute before writing installed links.
 
 On 2026-05-04, PR review found an appcast double-fetch race in `make update`: `scripts/update-local.mjs` read prod metadata before rebuild, while `scripts/build-linux-app.mjs` fetched appcast metadata again during rebuild. If prod advanced between those reads, the builder could produce a newer `dist/codex-linux-prod-<version>` than the updater later validated. The updater now refreshes live metadata after rebuild, recomputes the exact prod target from that refreshed response, retries once if the refreshed target is still stale, installs that refreshed build, and writes `data/upstream.json` from the same refreshed metadata only after install succeeds.
+
+On 2026-05-06, a local update to prod `26.429.61741` hit a native rebuild failure because the active Arch Python was 3.14.4 without `distutils` or `setuptools`, while the transient `electron-rebuild@3.2.9` / `node-gyp` path still imported `distutils.version.StrictVersion`. Installing `python-setuptools` system-wide should fix that prerequisite; when sudo is unavailable, a repo-local virtualenv also works:
+
+```bash
+python -m venv .cache/node-gyp-python
+.cache/node-gyp-python/bin/python -m pip install setuptools
+env npm_config_python="$PWD/.cache/node-gyp-python/bin/python" make update
+```
+
+That workaround completed the rebuild, installed the user-local launcher, and refreshed `data/upstream.json` to prod `26.429.61741` / build `2429`.
 
 ## Documentation Alignment Check
 

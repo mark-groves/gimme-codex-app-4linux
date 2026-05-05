@@ -2,13 +2,13 @@
   "prod": {
     "appcast": "https://persistent.oaistatic.com/codex-app-prod/appcast.xml",
     "latest": {
-      "title": "26.429.30905",
-      "version": "26.429.30905",
-      "build": "2345",
-      "published": "Fri, 01 May 2026 18:05:19 +0000",
+      "title": "26.429.61741",
+      "version": "26.429.61741",
+      "build": "2429",
+      "published": "Tue, 05 May 2026 18:04:50 +0000",
       "hardware": "arm64",
-      "url": "https://persistent.oaistatic.com/codex-app-prod/Codex-darwin-arm64-26.429.30905.zip",
-      "length": 313930800
+      "url": "https://persistent.oaistatic.com/codex-app-prod/Codex-darwin-arm64-26.429.61741.zip",
+      "length": 313930881
     }
   },
   "beta": {

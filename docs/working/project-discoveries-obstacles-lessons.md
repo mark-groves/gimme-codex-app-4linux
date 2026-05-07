@@ -1,6 +1,6 @@
 # Project Discoveries, Obstacles, And Lessons Learned
 
-Last updated: 2026-05-06.
+Last updated: 2026-05-07.
 
 This document records how this repo moved from "can we run the Codex desktop app on Omarchy?" to a working local Linux build pipeline. It is written for future maintainers and agents so they can understand the reasoning, avoid old traps, and continue from the current state instead of rediscovering everything.
 
@@ -410,3 +410,7 @@ On 2026-05-05, follow-up settings triage found the Configuration page writes use
 On 2026-05-05, the generated user-local prod desktop entry was aligned with the pacman package entry by using `Name=Codex` for `prod` builds, while keeping non-prod channels labeled, for example `Codex (beta)`. Future launcher label changes should preserve that distinction so the normal app grid entry is clean but beta installs remain visually identifiable.
 
 On 2026-05-07, CodeQL alert #1 (`actions/missing-workflow-permissions`) was validated for `.github/workflows/upstream-watch.yml`. The repository default workflow token permission was already read-only, but the workflow itself now declares `permissions: contents: read` so the appcast drift job remains least-privilege if repository defaults change.
+
+On 2026-05-07, floating Codex pets were traced to the upstream `avatarOverlay` BrowserWindow. The overlay relied on `setIgnoreMouseEvents(true, { forward: true })` so its renderer could keep receiving hover/mousemove events while clicks passed through transparent space, but Electron's own type docs mark `forward` as macOS/Windows-only. On Linux this can leave the overlay unable to re-enter its interactive state after it starts ignoring mouse events, making the pet effectively stuck. The builder now patches the avatar overlay on Linux to keep mouse events enabled and uses Electron's Linux `setShape(...)` support to restrict hit testing to the mascot and visible tray rectangles, which preserves dragging without letting the whole transparent overlay capture clicks.
+
+The same 2026-05-07 pet visual follow-up showed the blurry rectangles around pets and native context menus were caused by Omarchy's Hyprland defaults, not by the Codex webview assets. Omarchy tags all windows with `default-opacity` and applies `opacity 0.97 0.9`; that makes transparent XWayland surfaces appear as blurred rectangles under Hyprland. The persistent fix belongs in the user's Hyprland config: remove `default-opacity`, force `opacity 1 1`, and set `no_blur on` for `class ^Codex$` plus empty-class floating XWayland popup windows. Keep future Linux build patches focused on the interaction fix; do not shrink the pet overlay, force the tray closed, or strip upstream webview blur/dropdown classes for this issue.

@@ -334,6 +334,7 @@ async function patchExtractedApp({ appDir, channel, latest, packageJson }) {
   await fs.writeFile(path.join(appDir, "package.json"), `${JSON.stringify(nextPackageJson, null, 2)}\n`);
   await hideDefaultLinuxApplicationMenu(appDir);
   await makeLinuxAppWindowsOpaque(appDir);
+  await fixLinuxAvatarOverlay(appDir);
   await addLinuxOpenTargets(appDir);
 }
 
@@ -366,6 +367,60 @@ async function makeLinuxAppWindowsOpaque(appDir) {
     throw new Error("could not find Electron background-color helper to make Linux app windows opaque");
   }
   await fs.writeFile(mainBuildPath, mainBuild.replace(marker, replacement));
+}
+
+async function fixLinuxAvatarOverlay(appDir) {
+  const mainBuildPath = await findMainBuildPath(appDir);
+  let mainBuild = await fs.readFile(mainBuildPath, "utf8");
+  const replacements = [
+    {
+      marker:
+        "traySize=null;constructor(e,t){this.windowManager=e,this.globalState=t}",
+      replacement:
+        "traySize=null;trayVisible=!1;constructor(e,t){this.windowManager=e,this.globalState=t}",
+      description: "could not find avatar overlay state fields to track Linux tray shape visibility",
+    },
+    {
+      marker:
+        "setElementSize(e,{mascot:t,tray:n}){let r=this.window;r==null||r.isDestroyed()||r.webContents.id!==e||(this.cancelMomentum(),this.anchor={...this.anchor,width:t.width,height:t.height},this.mascotSize=t,this.traySize=n,this.applyLayout(r))}",
+      replacement:
+        "setElementSize(e,{isTrayVisible:t,mascot:r,tray:i}){let a=this.window;a==null||a.isDestroyed()||a.webContents.id!==e||(this.cancelMomentum(),this.anchor={...this.anchor,width:r.width,height:r.height},this.mascotSize=r,this.traySize=i,this.trayVisible=t===!0,this.applyLayout(a))}",
+      description: "could not find avatar overlay element-size handler to track Linux tray shape visibility",
+    },
+    {
+      marker:
+        "this.traySize=null,process.platform===`darwin`?t.setVisibleOnAllWorkspaces(!0,{visibleOnFullScreen:!0,skipTransformProcessType:!0}):t.setVisibleOnAllWorkspaces(!0),t.setAlwaysOnTop(!0,`floating`)",
+      replacement:
+        "this.traySize=null,this.trayVisible=!1,process.platform===`darwin`?t.setVisibleOnAllWorkspaces(!0,{visibleOnFullScreen:!0,skipTransformProcessType:!0}):t.setVisibleOnAllWorkspaces(!0),t.setAlwaysOnTop(!0,`floating`)",
+      description: "could not find avatar overlay window reset path to reset Linux tray shape visibility",
+    },
+    {
+      marker:
+        "setWindowBounds(e,t){e.isDestroyed()||OO(e.getContentBounds(),t)||e.setContentBounds(t,!1)}sendLayoutToRenderer(e){",
+      replacement:
+        "setWindowBounds(e,t){e.isDestroyed()||(OO(e.getContentBounds(),t)||e.setContentBounds(t,!1),this.applyLinuxWindowShape(e))}applyLinuxWindowShape(e){if(process.platform!==`linux`||e.isDestroyed()||typeof e.setShape!=`function`||this.layout==null)return;let t=this.layout,n=[t.mascot,...this.trayVisible&&t.tray!=null?[t.tray]:[]].map(e=>({x:e.left,y:e.top,width:e.width,height:e.height})).filter(e=>e.width>0&&e.height>0);try{e.setShape(n)}catch{}}sendLayoutToRenderer(e){",
+      description: "could not find avatar overlay window bounds path to apply Linux window shape",
+    },
+    {
+      marker:
+        "applyPointerInteractivityPolicy(){let e=this.window;if(e==null||e.isDestroyed()){this.mousePassthroughEnabled=!1;return}let t=!this.pointerInteractive;if(this.mousePassthroughEnabled!==t){if(this.mousePassthroughEnabled=t,t){e.setIgnoreMouseEvents(!0,{forward:!0});return}e.setIgnoreMouseEvents(!1),this.refreshCursorAtCurrentMousePosition(e)}}",
+      replacement:
+        "applyPointerInteractivityPolicy(){let e=this.window;if(e==null||e.isDestroyed()){this.mousePassthroughEnabled=!1;return}if(process.platform===`linux`){this.mousePassthroughEnabled=!1,e.setIgnoreMouseEvents(!1);return}let t=!this.pointerInteractive;if(this.mousePassthroughEnabled!==t){if(this.mousePassthroughEnabled=t,t){e.setIgnoreMouseEvents(!0,{forward:!0});return}e.setIgnoreMouseEvents(!1),this.refreshCursorAtCurrentMousePosition(e)}}",
+      description: "could not find avatar overlay pointer policy to avoid unsupported Linux mouse forwarding",
+    },
+  ];
+
+  for (const { marker, replacement, description } of replacements) {
+    if (mainBuild.includes(replacement)) {
+      continue;
+    }
+    if (!mainBuild.includes(marker)) {
+      throw new Error(description);
+    }
+    mainBuild = mainBuild.replace(marker, replacement);
+  }
+
+  await fs.writeFile(mainBuildPath, mainBuild);
 }
 
 async function addLinuxOpenTargets(appDir) {

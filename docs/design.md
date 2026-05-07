@@ -34,10 +34,11 @@ The generated build renames the runtime to `codex-electron`. In smoke testing th
 
 ## Linux App Patches
 
-The builder keeps the app code as close to upstream as possible, but applies two narrow Linux runtime patches to the extracted bundled JavaScript:
+The builder keeps the app code as close to upstream as possible, but applies narrow Linux runtime patches to the extracted bundled JavaScript:
 
 - It forces `Menu.setApplicationMenu(...)` to clear the application menu, because Electron's default Linux menu bar otherwise appears during startup.
 - It makes primary and secondary Linux app windows opaque so Hyprland/Wayland resize and underdraw issues do not reveal transparent wallpaper behind the app surface.
+- It makes the avatar overlay use Linux window shaping instead of ignored mouse-event forwarding, because Electron only forwards ignored mouse moves on macOS and Windows. This keeps the floating pet draggable without letting the whole transparent overlay rectangle capture clicks.
 
 These patches are string-anchored to the current bundled files and fail the build if the expected upstream markers disappear.
 

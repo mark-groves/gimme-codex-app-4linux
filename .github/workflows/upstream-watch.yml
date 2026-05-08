@@ -61,7 +61,7 @@ jobs:
             gh pr list \
               --repo "$GITHUB_REPOSITORY" \
               --state open \
-              --head "$GITHUB_REPOSITORY_OWNER:$PR_BRANCH" \
+              --head "$PR_BRANCH" \
               --json number \
               --jq '.[0].number // empty'
           )"

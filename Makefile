@@ -6,9 +6,12 @@ check:
 	node --check scripts/build-linux-app.mjs
 	node --check scripts/extract-asar.mjs
 	node --check scripts/lib/asar.mjs
+	node --check scripts/prepare-upstream-update-pr.mjs
 	node --check scripts/update-local.mjs
+	node --check scripts/test-upstream-update-pr.mjs
 	node --check scripts/test-update-local.mjs
 	bash scripts/test-install-local.sh
+	node scripts/test-upstream-update-pr.mjs
 	node scripts/test-update-local.mjs
 
 build:

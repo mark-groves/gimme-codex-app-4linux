@@ -72,7 +72,8 @@ if (args.write) {
 
 if (args.compare) {
   const expected = JSON.parse(await fs.readFile(args.compare, "utf8"));
-  const drift = compareSnapshots(expected, result);
+  const compareChannels = args.compareChannels.length > 0 ? args.compareChannels : Object.keys(feeds);
+  const drift = compareSnapshots(expected, result, compareChannels);
   if (drift.length > 0) {
     console.error("Upstream appcast drift detected:");
     for (const item of drift) {
@@ -85,7 +86,7 @@ if (args.compare) {
 console.log(JSON.stringify(result, null, 2));
 
 function parseArgs(argv) {
-  const parsed = {};
+  const parsed = { compareChannels: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--write" || arg === "--compare") {
@@ -97,8 +98,21 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (arg === "--compare-channel") {
+      const value = requiredValue(argv, ++index, arg);
+      if (!Object.hasOwn(feeds, value)) {
+        throw new Error(`unknown compare channel: ${value}`);
+      }
+      parsed.compareChannels.push(value);
+      continue;
+    }
     if (arg === "--help" || arg === "-h") {
-      console.log("Usage: node scripts/check-upstream.mjs [--write path] [--compare path]");
+      console.log(
+        [
+          "Usage: node scripts/check-upstream.mjs [--write path] [--compare path]",
+          "                                      [--compare-channel prod|beta]",
+        ].join("\n"),
+      );
       process.exit(0);
     }
     throw new Error(`unknown argument: ${arg}`);
@@ -106,9 +120,17 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function compareSnapshots(expected, actual) {
+function requiredValue(argv, index, flag) {
+  const value = argv[index];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${flag} requires a value`);
+  }
+  return value;
+}
+
+function compareSnapshots(expected, actual, channels) {
   const messages = [];
-  for (const channel of Object.keys(feeds)) {
+  for (const channel of channels) {
     const expectedLatest = expected[channel]?.latest;
     const actualLatest = actual[channel]?.latest;
     if (!expectedLatest || !actualLatest) {

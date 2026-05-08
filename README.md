@@ -78,12 +78,19 @@ The tracked snapshot lives in [data/upstream.json](data/upstream.json). Compare 
 node scripts/check-upstream.mjs --compare data/upstream.json
 ```
 
-The scheduled GitHub workflow in [.github/workflows/upstream-watch.yml](.github/workflows/upstream-watch.yml) runs that comparison every 6 hours and uploads the live metadata as an artifact.
+Limit the comparison to a channel when only that channel is actionable:
 
-Verified on 2026-05-04:
+```bash
+node scripts/check-upstream.mjs --compare data/upstream.json --compare-channel prod
+```
 
-- production appcast: `26.429.30905`, published 2026-05-01, build `2345`
-- beta appcast: `26.429.21146`, published 2026-04-30, build `2317`
+The scheduled GitHub workflow in [.github/workflows/upstream-watch.yml](.github/workflows/upstream-watch.yml) runs every 6 hours. It fetches live prod and beta metadata, uploads that metadata as an artifact, and opens or updates a PR when the production appcast changes. Beta remains visible in the snapshot and artifact, but beta-only drift does not create a PR because the local update/install path is currently prod-only.
+
+When the generated prod update PR merges, run the normal local update path to build and install the new version:
+
+```bash
+make update
+```
 
 ## Build Output
 

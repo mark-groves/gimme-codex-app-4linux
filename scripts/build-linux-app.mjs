@@ -303,9 +303,15 @@ async function installNativeModules({ appDir, electronVersion, workDir }) {
     )}\n`,
   );
 
-  await run("npm", ["install", "--ignore-scripts", "--package-lock=false"], { cwd: nativeDir });
+  const nodeGypPython = await ensureNodeGypPython();
+  const nativeBuildEnv = {
+    PYTHON: nodeGypPython,
+  };
+
+  await run("npm", ["install", "--ignore-scripts", "--package-lock=false"], { cwd: nativeDir, env: nativeBuildEnv });
   await run("npx", ["electron-rebuild", "--version", electronVersion, "--force", "--module-dir", nativeDir], {
     cwd: nativeDir,
+    env: nativeBuildEnv,
   });
 
   const runtimePackages = new Set(["better-sqlite3", "bindings", "file-uri-to-path", "node-addon-api", "node-pty"]);
@@ -356,16 +362,23 @@ async function hideDefaultLinuxApplicationMenu(appDir) {
 async function makeLinuxAppWindowsOpaque(appDir) {
   const mainBuildPath = await findMainBuildPath(appDir);
   const mainBuild = await fs.readFile(mainBuildPath, "utf8");
-  const marker =
-    "function PM({platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r}){return e===`win32`&&!jM(t)?";
-  const replacement =
-    "function PM({platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r}){return e===`linux`&&(t===`primary`||t===`secondary`)?{backgroundColor:r?fM:pM,backgroundMaterial:null}:e===`win32`&&!jM(t)?";
-  if (mainBuild.includes(replacement)) {
+  if (mainBuild.includes("e===`linux`&&(t===`primary`||t===`secondary`)?{backgroundColor:r?")) {
     return;
   }
-  if (!mainBuild.includes(marker)) {
+
+  const match = mainBuild.match(
+    /function ([A-Za-z_$][\w$]*)\(\{platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r\}\)\{return e===`win32`&&!([A-Za-z_$][\w$]*)\(t\)\?n\?\{backgroundColor:r\?([A-Za-z_$][\w$]*):([A-Za-z_$][\w$]*),backgroundMaterial:/,
+  );
+  if (!match) {
     throw new Error("could not find Electron background-color helper to make Linux app windows opaque");
   }
+
+  const [marker, helperName, transparentAppearanceHelper, darkColor, lightColor] = match;
+  const replacement =
+    `function ${helperName}({platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r}){return ` +
+    `e===\`linux\`&&(t===\`primary\`||t===\`secondary\`)?` +
+    `{backgroundColor:r?${darkColor}:${lightColor},backgroundMaterial:null}:` +
+    `e===\`win32\`&&!${transparentAppearanceHelper}(t)?n?{backgroundColor:r?${darkColor}:${lightColor},backgroundMaterial:`;
   await fs.writeFile(mainBuildPath, mainBuild.replace(marker, replacement));
 }
 
@@ -396,13 +409,6 @@ async function fixLinuxAvatarOverlay(appDir) {
     },
     {
       marker:
-        "setWindowBounds(e,t){e.isDestroyed()||OO(e.getContentBounds(),t)||e.setContentBounds(t,!1)}sendLayoutToRenderer(e){",
-      replacement:
-        "setWindowBounds(e,t){e.isDestroyed()||(OO(e.getContentBounds(),t)||e.setContentBounds(t,!1),this.applyLinuxWindowShape(e))}applyLinuxWindowShape(e){if(process.platform!==`linux`||e.isDestroyed()||typeof e.setShape!=`function`||this.layout==null)return;let t=this.layout,n=[t.mascot,...this.trayVisible&&t.tray!=null?[t.tray]:[]].map(e=>({x:e.left,y:e.top,width:e.width,height:e.height})).filter(e=>e.width>0&&e.height>0);try{e.setShape(n)}catch{}}sendLayoutToRenderer(e){",
-      description: "could not find avatar overlay window bounds path to apply Linux window shape",
-    },
-    {
-      marker:
         "applyPointerInteractivityPolicy(){let e=this.window;if(e==null||e.isDestroyed()){this.mousePassthroughEnabled=!1;return}let t=!this.pointerInteractive;if(this.mousePassthroughEnabled!==t){if(this.mousePassthroughEnabled=t,t){e.setIgnoreMouseEvents(!0,{forward:!0});return}e.setIgnoreMouseEvents(!1),this.refreshCursorAtCurrentMousePosition(e)}}",
       replacement:
         "applyPointerInteractivityPolicy(){let e=this.window;if(e==null||e.isDestroyed()){this.mousePassthroughEnabled=!1;return}if(process.platform===`linux`){this.mousePassthroughEnabled=!1,e.setIgnoreMouseEvents(!1);return}let t=!this.pointerInteractive;if(this.mousePassthroughEnabled!==t){if(this.mousePassthroughEnabled=t,t){e.setIgnoreMouseEvents(!0,{forward:!0});return}e.setIgnoreMouseEvents(!1),this.refreshCursorAtCurrentMousePosition(e)}}",
@@ -420,61 +426,191 @@ async function fixLinuxAvatarOverlay(appDir) {
     mainBuild = mainBuild.replace(marker, replacement);
   }
 
+  if (!mainBuild.includes("applyLinuxWindowShape(e){")) {
+    const match = mainBuild.match(
+      /setWindowBounds\(e,t\)\{e\.isDestroyed\(\)\|\|([A-Za-z_$][\w$]*)\(e\.getContentBounds\(\),t\)\|\|e\.setContentBounds\(t,!1\)\}sendLayoutToRenderer\(e\)\{/,
+    );
+    if (!match) {
+      throw new Error("could not find avatar overlay window bounds path to apply Linux window shape");
+    }
+    const [marker, boundsEqualHelper] = match;
+    const replacement =
+      `setWindowBounds(e,t){e.isDestroyed()||(${boundsEqualHelper}(e.getContentBounds(),t)||e.setContentBounds(t,!1),this.applyLinuxWindowShape(e))}` +
+      "applyLinuxWindowShape(e){if(process.platform!==`linux`||e.isDestroyed()||typeof e.setShape!=`function`||this.layout==null)return;let t=this.layout,n=[t.mascot,...this.trayVisible&&t.tray!=null?[t.tray]:[]].map(e=>({x:e.left,y:e.top,width:e.width,height:e.height})).filter(e=>e.width>0&&e.height>0);try{e.setShape(n)}catch{}}sendLayoutToRenderer(e){";
+    mainBuild = mainBuild.replace(marker, replacement);
+  }
+
   await fs.writeFile(mainBuildPath, mainBuild);
 }
 
 async function addLinuxOpenTargets(appDir) {
   const mainBuildPath = await findMainBuildPath(appDir);
   let mainBuild = await fs.readFile(mainBuildPath, "utf8");
-  const replacements = [
-    {
-      marker:
-        "function ih({id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,darwinEnv:a,darwinArgs:o,hidden:s}){return{id:e,platforms:{darwin:r?{label:t,icon:n,kind:`editor`,hidden:s,detect:r,env:a,args:o??ah,supportsSsh:!0}:void 0,win32:i?{label:t,icon:n,kind:`editor`,hidden:s,detect:i,args:ah,supportsSsh:!0}:void 0}}}",
-      replacement:
-        "function ih({id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,linuxDetect:c,darwinEnv:a,darwinArgs:o,hidden:s}){return{id:e,platforms:{darwin:r?{label:t,icon:n,kind:`editor`,hidden:s,detect:r,env:a,args:o??ah,supportsSsh:!0}:void 0,win32:i?{label:t,icon:n,kind:`editor`,hidden:s,detect:i,args:ah,supportsSsh:!0}:void 0,linux:c?{label:t,icon:n,kind:`editor`,hidden:s,detect:c,args:ah,supportsSsh:!0}:void 0}}}",
-      description: "could not find Electron open-target helper to add Linux editor support",
-    },
-    {
-      marker:
-        "var Og=ih({id:`vscode`,label:`VS Code`,icon:`apps/vscode.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`,`/Applications/Code.app/Contents/Resources/app/bin/code`]),win32Detect:kg});",
-      replacement:
-        "var Og=ih({id:`vscode`,label:`VS Code`,icon:`apps/vscode.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`,`/Applications/Code.app/Contents/Resources/app/bin/code`]),win32Detect:kg,linuxDetect:()=>q(`code`)});",
-      description: "could not find VS Code open-target marker to add Linux support",
-    },
-    {
-      marker:
-        "var Ag=ih({id:`vscodeInsiders`,label:`VS Code Insiders`,icon:`apps/vscode-insiders.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code`,`/Applications/Code - Insiders.app/Contents/Resources/app/bin/code`]),win32Detect:jg});",
-      replacement:
-        "var Ag=ih({id:`vscodeInsiders`,label:`VS Code Insiders`,icon:`apps/vscode-insiders.png`,darwinDetect:()=>_m([`/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code`,`/Applications/Code - Insiders.app/Contents/Resources/app/bin/code`]),win32Detect:jg,linuxDetect:()=>q(`code-insiders`)});",
-      description: "could not find VS Code Insiders open-target marker to add Linux support",
-    },
-    {
-      marker:
-        "Ih=rh({id:`fileManager`,label:`Finder`,icon:`apps/finder.png`,kind:`fileManager`,darwin:{detect:()=>`open`,args:e=>km(e)},win32:{label:`File Explorer`,icon:`apps/file-explorer.png`,detect:Lh,args:e=>km(e),open:async({path:e})=>Rh(e)}});function Lh(){",
-      replacement:
-        "Ih=rh({id:`fileManager`,label:`Finder`,icon:`apps/finder.png`,kind:`fileManager`,darwin:{detect:()=>`open`,args:e=>km(e)},win32:{label:`File Explorer`,icon:`apps/file-explorer.png`,detect:Lh,args:e=>km(e),open:async({path:e})=>Rh(e)},linux:{label:`Files`,icon:`apps/file-explorer.png`,detect:()=>q(`xdg-open`),args:e=>km(e)}});function Lh(){",
-      description: "could not find file manager open-target marker to add Linux support",
-    },
-    {
-      marker:
-        "var Xg=[Og,Ag,Eg,jh,ch,Fh,gg,Wg,Ng,oh,Wh,yg,Ih,uh,Vh,kh,Fg,Kh,Bh,Mg,zg,Qh,$h,eg,tg,ng,rg,ig,ag,Sg],Zg=t.Pr(`open-in-targets`);",
-      replacement:
-        "function codexLinuxGuiEditor(){for(let e of[`code`,`code-insiders`,`codium`,`cursor`,`zed`,`subl`,`sublime_text`,`gnome-text-editor`,`kate`,`gedit`,`xed`,`mousepad`]){let t=q(e);if(t)return t}return null}function codexLinuxGuiEditorArgs(e,t){let n=codexLinuxGuiEditor(),r=n?(0,i.basename)(n).toLowerCase():``;return t&&[`code`,`code-insiders`,`codium`,`cursor`,`zed`,`subl`,`sublime_text`].some(e=>r.includes(e))?Jm(e,t):[e]}var codexLinuxEditorTarget=rh({id:`linuxEditor`,label:`Text editor`,icon:`apps/vscode.png`,kind:`editor`,linux:{detect:codexLinuxGuiEditor,args:codexLinuxGuiEditorArgs}}),Xg=[Og,Ag,Eg,jh,ch,Fh,gg,Wg,codexLinuxEditorTarget,Ng,oh,Wh,yg,Ih,uh,Vh,kh,Fg,Kh,Bh,Mg,zg,Qh,$h,eg,tg,ng,rg,ig,ag,Sg],Zg=t.Pr(`open-in-targets`);",
-      description: "could not find open-target registry marker to add generic Linux editor support",
-    },
-  ];
+  const editorHelper = patchEditorTargetHelper(mainBuild);
+  mainBuild = editorHelper.mainBuild;
 
-  for (const { marker, replacement, description } of replacements) {
-    if (mainBuild.includes(replacement)) {
-      continue;
-    }
-    if (!mainBuild.includes(marker)) {
-      throw new Error(description);
-    }
-    mainBuild = mainBuild.replace(marker, replacement);
-  }
+  const codeLookup = findCommandLookupForEditorTarget({ mainBuild, id: "vscode", command: "code" });
+  mainBuild = patchEditorTargetLinuxDetect({
+    mainBuild,
+    id: "vscode",
+    label: "VS Code",
+    icon: "apps/vscode.png",
+    darwinPaths: [
+      "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+      "/Applications/Code.app/Contents/Resources/app/bin/code",
+    ],
+    command: "code",
+    commandLookup: codeLookup,
+  });
+  mainBuild = patchEditorTargetLinuxDetect({
+    mainBuild,
+    id: "vscodeInsiders",
+    label: "VS Code Insiders",
+    icon: "apps/vscode-insiders.png",
+    darwinPaths: [
+      "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code",
+      "/Applications/Code - Insiders.app/Contents/Resources/app/bin/code",
+    ],
+    command: "code-insiders",
+    commandLookup: codeLookup,
+  });
+
+  const fileManager = patchFileManagerLinuxTarget({ mainBuild, commandLookup: codeLookup });
+  mainBuild = fileManager.mainBuild;
+  mainBuild = patchGenericLinuxEditorTarget({
+    mainBuild,
+    commandLookup: codeLookup,
+    editorArgsHelper: editorHelper.argsHelper,
+    platformTargetHelper: fileManager.platformTargetHelper,
+    fileManagerVariable: fileManager.variable,
+  });
 
   await fs.writeFile(mainBuildPath, mainBuild);
+}
+
+function patchEditorTargetHelper(mainBuild) {
+  const existing = mainBuild.match(
+    /function ([A-Za-z_$][\w$]*)\(\{id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,linuxDetect:c,darwinEnv:a,darwinArgs:o,hidden:s\}\)\{return\{id:e,platforms:\{darwin:r\?\{label:t,icon:n,kind:`editor`,hidden:s,detect:r,env:a,args:o\?\?([A-Za-z_$][\w$]*),supportsSsh:!0\}:void 0,win32:i\?\{label:t,icon:n,kind:`editor`,hidden:s,detect:i,args:\2,supportsSsh:!0\}:void 0,linux:c\?\{label:t,icon:n,kind:`editor`,hidden:s,detect:c,args:\2,supportsSsh:!0\}:void 0\}\}\}/,
+  );
+  if (existing) {
+    return { mainBuild, helperName: existing[1], argsHelper: existing[2] };
+  }
+
+  const match = mainBuild.match(
+    /function ([A-Za-z_$][\w$]*)\(\{id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,darwinEnv:a,darwinArgs:o,hidden:s\}\)\{return\{id:e,platforms:\{darwin:r\?\{label:t,icon:n,kind:`editor`,hidden:s,detect:r,env:a,args:o\?\?([A-Za-z_$][\w$]*),supportsSsh:!0\}:void 0,win32:i\?\{label:t,icon:n,kind:`editor`,hidden:s,detect:i,args:\2,supportsSsh:!0\}:void 0\}\}\}/,
+  );
+  if (!match) {
+    throw new Error("could not find Electron open-target helper to add Linux editor support");
+  }
+
+  const [marker, helperName, argsHelper] = match;
+  const replacement =
+    `function ${helperName}({id:e,label:t,icon:n,darwinDetect:r,win32Detect:i,linuxDetect:c,darwinEnv:a,darwinArgs:o,hidden:s})` +
+    `{return{id:e,platforms:{darwin:r?{label:t,icon:n,kind:\`editor\`,hidden:s,detect:r,env:a,args:o??${argsHelper},supportsSsh:!0}:void 0,` +
+    `win32:i?{label:t,icon:n,kind:\`editor\`,hidden:s,detect:i,args:${argsHelper},supportsSsh:!0}:void 0,` +
+    `linux:c?{label:t,icon:n,kind:\`editor\`,hidden:s,detect:c,args:${argsHelper},supportsSsh:!0}:void 0}}}`;
+  return { mainBuild: mainBuild.replace(marker, replacement), helperName, argsHelper };
+}
+
+function findCommandLookupForEditorTarget({ mainBuild, id, command }) {
+  const target = findEditorTarget(mainBuild, id);
+  const win32Detect = target.match[4];
+  const escapedDetect = escapeRegExp(win32Detect);
+  const escapedCommand = escapeRegExp(command);
+  const lookup = mainBuild.match(
+    new RegExp(`function ${escapedDetect}\\(\\)\\{return [A-Za-z_$][\\w$]*\\(\\{pathCommand:([A-Za-z_$][\\w$]*)\\(\\\`${escapedCommand}\\\`\\)`),
+  );
+  if (!lookup) {
+    throw new Error(`could not find command lookup helper for ${id} open-target marker`);
+  }
+  return lookup[1];
+}
+
+function patchEditorTargetLinuxDetect({ mainBuild, id, label, icon, darwinPaths, command, commandLookup }) {
+  const target = findEditorTarget(mainBuild, id, { label, icon, darwinPaths });
+  const [marker, variable, helper, darwinDetectHelper, win32Detect] = target.match;
+  if (marker.includes("linuxDetect:")) {
+    return mainBuild;
+  }
+
+  const paths = darwinPaths.map((pathValue) => `\`${pathValue}\``).join(",");
+  const replacement =
+    `var ${variable}=${helper}({id:\`${id}\`,label:\`${label}\`,icon:\`${icon}\`,` +
+    `darwinDetect:()=>${darwinDetectHelper}([${paths}]),win32Detect:${win32Detect},linuxDetect:()=>${commandLookup}(\`${command}\`)});`;
+  return mainBuild.replace(marker, replacement);
+}
+
+function findEditorTarget(mainBuild, id, metadata) {
+  const labelPattern = metadata?.label == null ? "[^`]+" : escapeRegExp(metadata.label);
+  const iconPattern = metadata?.icon == null ? "[^`]+" : escapeRegExp(metadata.icon);
+  const paths = metadata?.darwinPaths
+    ? metadata.darwinPaths.map((pathValue) => `\\\`${escapeRegExp(pathValue)}\\\``).join(",")
+    : "[^\\]]+";
+  const target = mainBuild.match(
+    new RegExp(
+      `var ([A-Za-z_$][\\w$]*)=([A-Za-z_$][\\w$]*)\\(\\{id:\\\`${escapeRegExp(id)}\\\`,label:\\\`${labelPattern}\\\`,icon:\\\`${iconPattern}\\\`,darwinDetect:\\(\\)=>` +
+        `([A-Za-z_$][\\w$]*)\\(\\[${paths}\\]\\),win32Detect:([A-Za-z_$][\\w$]*)(?:,linuxDetect:\\(\\)=>[A-Za-z_$][\\w$]*\\(\\\`[^\\\`]+\\\`\\))?\\}\\);`,
+    ),
+  );
+  if (!target) {
+    throw new Error(`could not find ${id} open-target marker to add Linux support`);
+  }
+  return { match: target };
+}
+
+function patchFileManagerLinuxTarget({ mainBuild, commandLookup }) {
+  const existing = mainBuild.match(
+    /(var )?([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\(\{id:`fileManager`,label:`Finder`,icon:`apps\/finder\.png`,kind:`fileManager`,darwin:\{detect:\(\)=>`open`,args:e=>([A-Za-z_$][\w$]*)\(e\)\},win32:\{label:`File Explorer`,icon:`apps\/file-explorer\.png`,detect:([A-Za-z_$][\w$]*),args:e=>\4\(e\),open:async\(\{path:e\}\)=>[A-Za-z_$][\w$]*\(e\)\},linux:\{label:`Files`,icon:`apps\/file-explorer\.png`,detect:\(\)=>[A-Za-z_$][\w$]*\(`xdg-open`\),args:e=>\4\(e\)\}\}\);/,
+  );
+  if (existing) {
+    return { mainBuild, variable: existing[2], platformTargetHelper: existing[3], argsHelper: existing[4] };
+  }
+
+  const match = mainBuild.match(
+    /(var )?([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\(\{id:`fileManager`,label:`Finder`,icon:`apps\/finder\.png`,kind:`fileManager`,darwin:\{detect:\(\)=>`open`,args:e=>([A-Za-z_$][\w$]*)\(e\)\},win32:\{label:`File Explorer`,icon:`apps\/file-explorer\.png`,detect:([A-Za-z_$][\w$]*),args:e=>\4\(e\),open:async\(\{path:e\}\)=>([A-Za-z_$][\w$]*)\(e\)\}\}\);/,
+  );
+  if (!match) {
+    throw new Error("could not find file manager open-target marker to add Linux support");
+  }
+
+  const [marker, declarationPrefix = "", variable, platformTargetHelper, argsHelper, win32Detect, win32Open] = match;
+  const replacement =
+    `${declarationPrefix}${variable}=${platformTargetHelper}({id:\`fileManager\`,label:\`Finder\`,icon:\`apps/finder.png\`,kind:\`fileManager\`,` +
+    `darwin:{detect:()=>\`open\`,args:e=>${argsHelper}(e)},` +
+    `win32:{label:\`File Explorer\`,icon:\`apps/file-explorer.png\`,detect:${win32Detect},args:e=>${argsHelper}(e),open:async({path:e})=>${win32Open}(e)},` +
+    `linux:{label:\`Files\`,icon:\`apps/file-explorer.png\`,detect:()=>${commandLookup}(\`xdg-open\`),args:e=>${argsHelper}(e)}});`;
+  return {
+    mainBuild: mainBuild.replace(marker, replacement),
+    variable,
+    platformTargetHelper,
+    argsHelper,
+  };
+}
+
+function patchGenericLinuxEditorTarget({ mainBuild, commandLookup, editorArgsHelper, platformTargetHelper, fileManagerVariable }) {
+  if (mainBuild.includes("codexLinuxEditorTarget=")) {
+    return mainBuild;
+  }
+
+  const match = mainBuild.match(/var ([A-Za-z_$][\w$]*)=\[([^\]]+)\],([A-Za-z_$][\w$]*)=t\.Kr\(`open-in-targets`\);/);
+  if (!match) {
+    throw new Error("could not find open-target registry marker to add generic Linux editor support");
+  }
+
+  const [marker, registryVariable, registryItems, loggerVariable] = match;
+  const nextRegistryItems = registryItems.split(",").includes(fileManagerVariable)
+    ? registryItems.replace(fileManagerVariable, `codexLinuxEditorTarget,${fileManagerVariable}`)
+    : `codexLinuxEditorTarget,${registryItems}`;
+  const replacement =
+    `function codexLinuxGuiEditor(){for(let e of[\`code\`,\`code-insiders\`,\`codium\`,\`cursor\`,\`zed\`,\`subl\`,\`sublime_text\`,\`gnome-text-editor\`,\`kate\`,\`gedit\`,\`xed\`,\`mousepad\`]){let t=${commandLookup}(e);if(t)return t}return null}` +
+    `function codexLinuxGuiEditorArgs(e,t){let n=codexLinuxGuiEditor(),r=n?(0,i.basename)(n).toLowerCase():\`\`;return t&&[\`code\`,\`code-insiders\`,\`codium\`,\`cursor\`,\`zed\`,\`subl\`,\`sublime_text\`].some(e=>r.includes(e))?${editorArgsHelper}(e,t):[e]}` +
+    `var codexLinuxEditorTarget=${platformTargetHelper}({id:\`linuxEditor\`,label:\`Text editor\`,icon:\`apps/vscode.png\`,kind:\`editor\`,linux:{detect:codexLinuxGuiEditor,args:codexLinuxGuiEditorArgs}}),` +
+    `${registryVariable}=[${nextRegistryItems}],${loggerVariable}=t.Kr(\`open-in-targets\`);`;
+  return mainBuild.replace(marker, replacement);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function findMainBuildPath(appDir) {
@@ -741,6 +877,46 @@ async function removeDarwinBuildDebris(appDir) {
   }
 }
 
+async function ensureNodeGypPython() {
+  const candidates = [
+    process.env.npm_config_python,
+    process.env.PYTHON,
+    "python3",
+    "python",
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (await pythonHasDistutils(candidate)) {
+      return candidate;
+    }
+  }
+
+  const venvDir = path.join(cacheDir, "python-node-gyp");
+  const venvPython = path.join(venvDir, "bin", "python");
+  if (await missing(venvPython)) {
+    await run("python3", ["-m", "venv", venvDir]);
+  }
+  if (!(await pythonHasDistutils(venvPython))) {
+    await run(venvPython, ["-m", "pip", "install", "--upgrade", "setuptools"]);
+  }
+  if (!(await pythonHasDistutils(venvPython))) {
+    throw new Error("Python used by node-gyp is missing distutils even after installing setuptools into the build venv");
+  }
+  return venvPython;
+}
+
+function pythonHasDistutils(command) {
+  return new Promise((resolve) => {
+    const child = spawn(command, ["-c", "import distutils"], {
+      cwd: rootDir,
+      env: process.env,
+      stdio: "ignore",
+    });
+    child.on("error", () => resolve(false));
+    child.on("exit", code => resolve(code === 0));
+  });
+}
+
 async function copyDir(from, to) {
   await fs.rm(to, { force: true, recursive: true });
   await fs.cp(from, to, { dereference: true, recursive: true });
@@ -775,6 +951,7 @@ async function run(command, args, options = {}) {
       cwd: options.cwd ?? rootDir,
       env: {
         ...process.env,
+        ...options.env,
         npm_config_fund: "false",
         npm_config_audit: "false",
       },

@@ -2,25 +2,25 @@
   "prod": {
     "appcast": "https://persistent.oaistatic.com/codex-app-prod/appcast.xml",
     "latest": {
-      "title": "26.429.61741",
-      "version": "26.429.61741",
-      "build": "2429",
-      "published": "Tue, 05 May 2026 18:04:50 +0000",
+      "title": "26.506.31421",
+      "version": "26.506.31421",
+      "build": "2620",
+      "published": "Fri, 08 May 2026 22:49:55 +0000",
       "hardware": "arm64",
-      "url": "https://persistent.oaistatic.com/codex-app-prod/Codex-darwin-arm64-26.429.61741.zip",
-      "length": 313930881
+      "url": "https://persistent.oaistatic.com/codex-app-prod/Codex-darwin-arm64-26.506.31421.zip",
+      "length": 321830867
     }
   },
   "beta": {
     "appcast": "https://persistent.oaistatic.com/codex-app-beta/appcast.xml",
     "latest": {
-      "title": "26.429.21146",
-      "version": "26.429.21146",
-      "build": "2317",
-      "published": "Thu, 30 Apr 2026 21:18:12 +0000",
+      "title": "26.506.31421",
+      "version": "26.506.31421",
+      "build": "2619",
+      "published": "Fri, 08 May 2026 22:50:40 +0000",
       "hardware": "arm64",
-      "url": "https://persistent.oaistatic.com/codex-app-beta/Codex%20(Beta)-darwin-arm64-26.429.21146.zip",
-      "length": 315687338
+      "url": "https://persistent.oaistatic.com/codex-app-beta/Codex%20(Beta)-darwin-arm64-26.506.31421.zip",
+      "length": 322081362
     }
   }
 }

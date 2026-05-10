@@ -340,6 +340,7 @@ async function patchExtractedApp({ appDir, channel, latest, packageJson }) {
   delete nextPackageJson.devDependencies;
   await fs.writeFile(path.join(appDir, "package.json"), `${JSON.stringify(nextPackageJson, null, 2)}\n`);
   await hideDefaultLinuxApplicationMenu(appDir);
+  await addLinuxVersionBadge({ appDir, channel, latest, packageJson });
   await makeLinuxAppWindowsOpaque(appDir);
   await fixLinuxAvatarOverlay(appDir);
   await addLinuxOpenTargets(appDir);
@@ -358,6 +359,64 @@ async function hideDefaultLinuxApplicationMenu(appDir) {
     throw new Error("could not find Electron bootstrap ready marker to hide the Linux application menu");
   }
   await fs.writeFile(bootstrapPath, bootstrap.replace(marker, replacement));
+}
+
+async function addLinuxVersionBadge({ appDir, channel, latest, packageJson }) {
+  const bootstrapPath = path.join(appDir, ".vite", "build", "bootstrap.js");
+  const bootstrap = await fs.readFile(bootstrapPath, "utf8");
+  if (bootstrap.includes("codex-linux-version-badge")) {
+    return;
+  }
+
+  const { badgeText, badgeTitle } = linuxVersionBadgeMetadata({ channel, latest, packageJson });
+  const browserScript = versionBadgeBrowserScript({ badgeText, badgeTitle });
+  const marker = "n.app.whenReady().then(async()=>{";
+  const installer =
+    "(function(e){if(process.platform!==`linux`||process.env.CODEX_LINUX_VERSION_BADGE===`0`)return;" +
+    `let t=${JSON.stringify(browserScript)},n=e=>{if(!e||e.isDestroyed()||e.__codexLinuxVersionBadgeAttached||typeof e.isAlwaysOnTop==\`function\`&&e.isAlwaysOnTop())return;` +
+    "e.__codexLinuxVersionBadgeAttached=!0;let n=()=>{if(e.isDestroyed()||typeof e.isAlwaysOnTop==`function`&&e.isAlwaysOnTop())return;let r=e.webContents.getURL();r&&!r.startsWith(`app://`)||e.webContents.executeJavaScript(t,!0).catch(()=>{})};" +
+    "e.webContents.on(`dom-ready`,n),e.webContents.on(`did-finish-load`,n),n()};e.app.on(`browser-window-created`,(e,t)=>n(t));for(let t of e.BrowserWindow.getAllWindows())n(t)})(n);";
+  const replacement = `${marker}${installer}`;
+  if (!bootstrap.includes(marker)) {
+    throw new Error("could not find Electron bootstrap ready marker to add Linux version badge");
+  }
+  await fs.writeFile(bootstrapPath, bootstrap.replace(marker, replacement));
+}
+
+function linuxVersionBadgeMetadata({ channel, latest, packageJson }) {
+  const appVersion = requireLinuxBadgeToken({
+    label: "app package version",
+    pattern: /^[A-Za-z0-9._+~-]{1,64}$/,
+    value: packageJson.version,
+  });
+  const appcastBuild = requireLinuxBadgeToken({
+    label: "appcast build",
+    pattern: /^[0-9]{1,20}$/,
+    value: latest.build,
+  });
+  const badgeChannel = requireLinuxBadgeToken({
+    label: "channel",
+    pattern: /^(?:prod|beta)$/,
+    value: channel,
+  });
+
+  return {
+    badgeText: `Codex ${appVersion} | ${badgeChannel} ${appcastBuild}`,
+    badgeTitle: `Codex Linux ${badgeChannel} build ${appcastBuild} from app ${appVersion}`,
+  };
+}
+
+function requireLinuxBadgeToken({ label, pattern, value }) {
+  if (typeof value !== "string" || !pattern.test(value)) {
+    throw new Error(`invalid Linux version badge ${label}: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+function versionBadgeBrowserScript({ badgeText, badgeTitle }) {
+  return `(()=>{try{if(!document.body)return;let e="codex-linux-version-badge",t=${JSON.stringify(badgeText)},n=${JSON.stringify(
+    badgeTitle,
+  )},r=document.getElementById(e);r||(r=document.createElement("div"),r.id=e,r.setAttribute("aria-label","Codex Linux version"),r.style.cssText="position:fixed;right:12px;bottom:12px;z-index:2147483647;pointer-events:none;font:11px/1.35 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:#fff;background:rgba(17,24,39,.88);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:4px 7px;box-shadow:0 6px 18px rgba(0,0,0,.22);backdrop-filter:blur(6px);",document.body.appendChild(r)),r.textContent=t,r.title=n}catch{}})();`;
 }
 
 async function makeLinuxAppWindowsOpaque(appDir) {

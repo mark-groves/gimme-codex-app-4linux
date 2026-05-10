@@ -368,8 +368,7 @@ async function addLinuxVersionBadge({ appDir, channel, latest, packageJson }) {
     return;
   }
 
-  const badgeText = `Codex ${packageJson.version} | ${channel} ${latest.build}`;
-  const badgeTitle = `Codex Linux ${channel} build ${latest.build} from app ${packageJson.version}`;
+  const { badgeText, badgeTitle } = linuxVersionBadgeMetadata({ channel, latest, packageJson });
   const browserScript = versionBadgeBrowserScript({ badgeText, badgeTitle });
   const marker = "n.app.whenReady().then(async()=>{";
   const installer =
@@ -382,6 +381,36 @@ async function addLinuxVersionBadge({ appDir, channel, latest, packageJson }) {
     throw new Error("could not find Electron bootstrap ready marker to add Linux version badge");
   }
   await fs.writeFile(bootstrapPath, bootstrap.replace(marker, replacement));
+}
+
+function linuxVersionBadgeMetadata({ channel, latest, packageJson }) {
+  const appVersion = requireLinuxBadgeToken({
+    label: "app package version",
+    pattern: /^[A-Za-z0-9._+~-]{1,64}$/,
+    value: packageJson.version,
+  });
+  const appcastBuild = requireLinuxBadgeToken({
+    label: "appcast build",
+    pattern: /^[0-9]{1,20}$/,
+    value: latest.build,
+  });
+  const badgeChannel = requireLinuxBadgeToken({
+    label: "channel",
+    pattern: /^(?:prod|beta)$/,
+    value: channel,
+  });
+
+  return {
+    badgeText: `Codex ${appVersion} | ${badgeChannel} ${appcastBuild}`,
+    badgeTitle: `Codex Linux ${badgeChannel} build ${appcastBuild} from app ${appVersion}`,
+  };
+}
+
+function requireLinuxBadgeToken({ label, pattern, value }) {
+  if (typeof value !== "string" || !pattern.test(value)) {
+    throw new Error(`invalid Linux version badge ${label}: ${JSON.stringify(value)}`);
+  }
+  return value;
 }
 
 function versionBadgeBrowserScript({ badgeText, badgeTitle }) {

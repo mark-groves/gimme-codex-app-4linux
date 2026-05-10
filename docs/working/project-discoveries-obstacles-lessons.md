@@ -1,6 +1,6 @@
 # Project Discoveries, Obstacles, And Lessons Learned
 
-Last updated: 2026-05-08.
+Last updated: 2026-05-10.
 
 This document records how this repo moved from "can we run the Codex desktop app on Omarchy?" to a working local Linux build pipeline. It is written for future maintainers and agents so they can understand the reasoning, avoid old traps, and continue from the current state instead of rediscovering everything.
 
@@ -392,6 +392,8 @@ env npm_config_python="$PWD/.cache/node-gyp-python/bin/python" make update
 ```
 
 That workaround completed the rebuild, installed the user-local launcher, and refreshed `data/upstream.json` to prod `26.429.61741` / build `2429`.
+
+On 2026-05-10, updating to prod `26.506.31421` showed two recurring update risks. First, upstream minified symbol names changed in the window-backdrop, avatar overlay, and open-target code, so exact string patches such as the older `PM(...)` background helper broke even though the same behavior still existed under new names. The builder now matches those patch sites by helper shape and captures the current minified symbols instead of pinning one upstream build's names. Second, Arch Python 3.14.4 still lacked `distutils`; the builder now falls back to `.cache/python-node-gyp` with `setuptools` and passes that interpreter through both `PYTHON` and `npm_config_python` for native module rebuilds. PR review also found that an inherited `npm_config_python` can override `PYTHON` when npm or npx invokes node-gyp, so the native rebuild environment now forces it to the selected fallback interpreter. A rerun of `make update` built and installed prod `26.506.31421` / build `2620`.
 
 ## Documentation Alignment Check
 

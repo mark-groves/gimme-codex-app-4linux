@@ -373,7 +373,7 @@ async function addLinuxVersionBadge({ appDir, channel, latest, packageJson }) {
   const marker = "n.app.whenReady().then(async()=>{";
   const installer =
     "(function(e){if(process.platform!==`linux`)return;" +
-    `let t=${JSON.stringify(browserScript)},n=${JSON.stringify(badgeTitle)},r=process.env.CODEX_LINUX_VERSION_BADGE===\`1\`,o=e=>{if(!e||e.isDestroyed()||e.__codexLinuxVersionBadgeAttached||typeof e.isAlwaysOnTop==\`function\`&&e.isAlwaysOnTop())return;` +
+    `let t=${JSON.stringify(browserScript)},n=${JSON.stringify(badgeTitle)},r=process.env.CODEX_LINUX_VERSION_BADGE!==\`0\`,o=e=>{if(!e||e.isDestroyed()||e.__codexLinuxVersionBadgeAttached||typeof e.isAlwaysOnTop==\`function\`&&e.isAlwaysOnTop())return;` +
     "e.__codexLinuxVersionBadgeAttached=!0;try{typeof e.setTitle==`function`&&e.setTitle(n)}catch{}let o=()=>{if(e.isDestroyed()||typeof e.isAlwaysOnTop==`function`&&e.isAlwaysOnTop())return;let n=e.webContents.getURL();n&&!n.startsWith(`app://`)||e.webContents.executeJavaScript(t+`(${r?`true`:`false`})`,!0).catch(()=>{})};" +
     "e.webContents.on(`dom-ready`,o),e.webContents.on(`did-finish-load`,o),o()};e.app.on(`browser-window-created`,(e,t)=>o(t));for(let t of e.BrowserWindow.getAllWindows())o(t)})(n);";
   const replacement = `${marker}${installer}`;
@@ -416,7 +416,7 @@ function requireLinuxBadgeToken({ label, pattern, value }) {
 function versionBadgeBrowserScript({ badgeText, badgeTitle }) {
   return `(e=>{try{let t=${JSON.stringify(badgeText)},n=${JSON.stringify(
     badgeTitle,
-  )},r=document.documentElement;r&&(r.dataset.codexLinuxVersion=t,r.dataset.codexLinuxVersionTitle=n),document.title=n;let o=document.getElementById("codex-linux-version-badge");if(!e){o&&o.remove();return}if(!document.body)return;o||(o=document.createElement("div"),o.id="codex-linux-version-badge",o.setAttribute("aria-label","Codex Linux version"),o.style.cssText="position:fixed;left:18px;bottom:54px;z-index:2147483647;pointer-events:none;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:10px/1.25 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:rgba(203,213,225,.72);background:rgba(17,24,39,.32);border:1px solid rgba(148,163,184,.18);border-radius:999px;padding:3px 7px;box-shadow:0 3px 10px rgba(0,0,0,.1);backdrop-filter:blur(6px);",document.body.appendChild(o)),o.textContent=t,o.title=n}catch{}})`;
+  )},r=document.documentElement;r&&(r.dataset.codexLinuxVersion=t,r.dataset.codexLinuxVersionTitle=n),document.title=n;let o=document.getElementById("codex-linux-version-badge");if(!e){o&&o.remove();return}if(!document.body)return;o||(o=document.createElement("div"),o.id="codex-linux-version-badge",o.setAttribute("aria-label","Codex Linux version"),o.style.cssText="position:fixed;left:58px;bottom:50px;z-index:2147483647;pointer-events:none;max-width:min(270px,calc(100vw - 92px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:10px/1.25 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:rgba(203,213,225,.58);background:transparent;border:0;padding:0;text-shadow:0 1px 2px rgba(0,0,0,.35);",document.body.appendChild(o)),o.textContent=t,o.title=n}catch{}})`;
 }
 
 async function makeLinuxAppWindowsOpaque(appDir) {

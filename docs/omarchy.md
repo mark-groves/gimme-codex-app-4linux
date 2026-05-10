@@ -34,7 +34,7 @@ make update
 
 `make update` checks the live prod appcast, rebuilds only when the tracked prod version/build changed or the matching local build is missing/stale, installs that exact build, and updates `data/upstream.json` only after build/install succeeds.
 
-After launch, confirm the converted desktop app by checking the window title, for example `Codex Linux prod build 2620 from app 26.506.31421`. To show a temporary in-window badge for debugging, run with `CODEX_LINUX_VERSION_BADGE=1`.
+After launch, confirm the converted desktop app by reading the sidebar footer version label, for example `Codex 26.506.31421 | prod 2620`. To hide the label for a session, run with `CODEX_LINUX_VERSION_BADGE=0`.
 
 To force the lower-level build/install path:
 

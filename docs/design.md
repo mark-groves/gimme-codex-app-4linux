@@ -37,7 +37,7 @@ The generated build renames the runtime to `codex-electron`. In smoke testing th
 The builder keeps the app code as close to upstream as possible, but applies narrow Linux runtime patches to the extracted bundled JavaScript:
 
 - It forces `Menu.setApplicationMenu(...)` to clear the application menu, because Electron's default Linux menu bar otherwise appears during startup.
-- It labels normal Linux app windows after `app.whenReady()` with the converted app version, channel, and appcast build. An in-window badge remains available with `CODEX_LINUX_VERSION_BADGE=1` for debugging, but is not shown by default.
+- It labels normal Linux app windows after `app.whenReady()` with the converted app version, channel, and appcast build, and shows the same metadata as a small sidebar-footer label that can be hidden with `CODEX_LINUX_VERSION_BADGE=0`.
 - It makes primary and secondary Linux app windows opaque so Hyprland/Wayland resize and underdraw issues do not reveal transparent wallpaper behind the app surface.
 - It makes the avatar overlay use Linux window shaping instead of ignored mouse-event forwarding, because Electron only forwards ignored mouse moves on macOS and Windows. This keeps the floating pet draggable without letting the whole transparent overlay rectangle capture clicks.
 

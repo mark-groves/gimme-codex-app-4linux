@@ -306,6 +306,7 @@ async function installNativeModules({ appDir, electronVersion, workDir }) {
   const nodeGypPython = await ensureNodeGypPython();
   const nativeBuildEnv = {
     PYTHON: nodeGypPython,
+    npm_config_python: nodeGypPython,
   };
 
   await run("npm", ["install", "--ignore-scripts", "--package-lock=false"], { cwd: nativeDir, env: nativeBuildEnv });

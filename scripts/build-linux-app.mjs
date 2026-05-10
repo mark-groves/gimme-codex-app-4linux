@@ -416,7 +416,7 @@ function requireLinuxBadgeToken({ label, pattern, value }) {
 function versionBadgeBrowserScript({ badgeText, badgeTitle }) {
   return `(()=>{try{if(!document.body)return;let e="codex-linux-version-badge",t=${JSON.stringify(badgeText)},n=${JSON.stringify(
     badgeTitle,
-  )},r=document.getElementById(e);r||(r=document.createElement("div"),r.id=e,r.setAttribute("aria-label","Codex Linux version"),r.style.cssText="position:fixed;right:12px;bottom:12px;z-index:2147483647;pointer-events:none;font:11px/1.35 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:#fff;background:rgba(17,24,39,.88);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:4px 7px;box-shadow:0 6px 18px rgba(0,0,0,.22);backdrop-filter:blur(6px);",document.body.appendChild(r)),r.textContent=t,r.title=n}catch{}})();`;
+  )},r=document.getElementById(e);r||(r=document.createElement("div"),r.id=e,r.setAttribute("aria-label","Codex Linux version"),r.style.cssText="position:fixed;top:9px;right:96px;z-index:2147483647;pointer-events:none;max-width:min(240px,32vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:10px/1.25 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:rgba(255,255,255,.82);background:rgba(17,24,39,.56);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:3px 7px;box-shadow:0 3px 10px rgba(0,0,0,.12);backdrop-filter:blur(6px);",document.body.appendChild(r)),r.textContent=t,r.title=n}catch{}})();`;
 }
 
 async function makeLinuxAppWindowsOpaque(appDir) {

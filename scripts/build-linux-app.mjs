@@ -372,10 +372,10 @@ async function addLinuxVersionBadge({ appDir, channel, latest, packageJson }) {
   const browserScript = versionBadgeBrowserScript({ badgeText, badgeTitle });
   const marker = "n.app.whenReady().then(async()=>{";
   const installer =
-    "(function(e){if(process.platform!==`linux`||process.env.CODEX_LINUX_VERSION_BADGE===`0`)return;" +
-    `let t=${JSON.stringify(browserScript)},n=e=>{if(!e||e.isDestroyed()||e.__codexLinuxVersionBadgeAttached||typeof e.isAlwaysOnTop==\`function\`&&e.isAlwaysOnTop())return;` +
-    "e.__codexLinuxVersionBadgeAttached=!0;let n=()=>{if(e.isDestroyed()||typeof e.isAlwaysOnTop==`function`&&e.isAlwaysOnTop())return;let r=e.webContents.getURL();r&&!r.startsWith(`app://`)||e.webContents.executeJavaScript(t,!0).catch(()=>{})};" +
-    "e.webContents.on(`dom-ready`,n),e.webContents.on(`did-finish-load`,n),n()};e.app.on(`browser-window-created`,(e,t)=>n(t));for(let t of e.BrowserWindow.getAllWindows())n(t)})(n);";
+    "(function(e){if(process.platform!==`linux`)return;" +
+    `let t=${JSON.stringify(browserScript)},n=${JSON.stringify(badgeTitle)},r=process.env.CODEX_LINUX_VERSION_BADGE===\`1\`,o=e=>{if(!e||e.isDestroyed()||e.__codexLinuxVersionBadgeAttached||typeof e.isAlwaysOnTop==\`function\`&&e.isAlwaysOnTop())return;` +
+    "e.__codexLinuxVersionBadgeAttached=!0;try{typeof e.setTitle==`function`&&e.setTitle(n)}catch{}let o=()=>{if(e.isDestroyed()||typeof e.isAlwaysOnTop==`function`&&e.isAlwaysOnTop())return;let n=e.webContents.getURL();n&&!n.startsWith(`app://`)||e.webContents.executeJavaScript(t+`(${r?`true`:`false`})`,!0).catch(()=>{})};" +
+    "e.webContents.on(`dom-ready`,o),e.webContents.on(`did-finish-load`,o),o()};e.app.on(`browser-window-created`,(e,t)=>o(t));for(let t of e.BrowserWindow.getAllWindows())o(t)})(n);";
   const replacement = `${marker}${installer}`;
   if (!bootstrap.includes(marker)) {
     throw new Error("could not find Electron bootstrap ready marker to add Linux version badge");
@@ -414,9 +414,9 @@ function requireLinuxBadgeToken({ label, pattern, value }) {
 }
 
 function versionBadgeBrowserScript({ badgeText, badgeTitle }) {
-  return `(()=>{try{if(!document.body)return;let e="codex-linux-version-badge",t=${JSON.stringify(badgeText)},n=${JSON.stringify(
+  return `(e=>{try{let t=${JSON.stringify(badgeText)},n=${JSON.stringify(
     badgeTitle,
-  )},r=document.getElementById(e);r||(r=document.createElement("div"),r.id=e,r.setAttribute("aria-label","Codex Linux version"),r.style.cssText="position:fixed;top:9px;right:96px;z-index:2147483647;pointer-events:none;max-width:min(240px,32vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:10px/1.25 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:rgba(255,255,255,.82);background:rgba(17,24,39,.56);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:3px 7px;box-shadow:0 3px 10px rgba(0,0,0,.12);backdrop-filter:blur(6px);",document.body.appendChild(r)),r.textContent=t,r.title=n}catch{}})();`;
+  )},r=document.documentElement;r&&(r.dataset.codexLinuxVersion=t,r.dataset.codexLinuxVersionTitle=n),document.title=n;let o=document.getElementById("codex-linux-version-badge");if(!e){o&&o.remove();return}if(!document.body)return;o||(o=document.createElement("div"),o.id="codex-linux-version-badge",o.setAttribute("aria-label","Codex Linux version"),o.style.cssText="position:fixed;left:18px;bottom:54px;z-index:2147483647;pointer-events:none;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:10px/1.25 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;color:rgba(203,213,225,.72);background:rgba(17,24,39,.32);border:1px solid rgba(148,163,184,.18);border-radius:999px;padding:3px 7px;box-shadow:0 3px 10px rgba(0,0,0,.1);backdrop-filter:blur(6px);",document.body.appendChild(o)),o.textContent=t,o.title=n}catch{}})`;
 }
 
 async function makeLinuxAppWindowsOpaque(appDir) {

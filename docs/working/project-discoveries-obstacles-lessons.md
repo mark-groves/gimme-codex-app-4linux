@@ -1,6 +1,6 @@
 # Project Discoveries, Obstacles, And Lessons Learned
 
-Last updated: 2026-05-10.
+Last updated: 2026-05-15.
 
 This document records how this repo moved from "can we run the Codex desktop app on Omarchy?" to a working local Linux build pipeline. It is written for future maintainers and agents so they can understand the reasoning, avoid old traps, and continue from the current state instead of rediscovering everything.
 
@@ -411,7 +411,7 @@ On 2026-05-05, follow-up settings triage found the Configuration page writes use
 
 On 2026-05-05, the generated user-local prod desktop entry was aligned with the pacman package entry by using `Name=Codex` for `prod` builds, while keeping non-prod channels labeled, for example `Codex (beta)`. Future launcher label changes should preserve that distinction so the normal app grid entry is clean but beta installs remain visually identifiable.
 
-On 2026-05-10, the Linux conversion added a visual version badge by patching the Electron bootstrap rather than the minified renderer bundle. The badge is injected after `app.whenReady()`, attaches to normal app BrowserWindows through `browser-window-created`, skips always-on-top overlay windows, and can be disabled with `CODEX_LINUX_VERSION_BADGE=0`. A remote-debugging launch confirmed the renderer contained a fixed `codex-linux-version-badge` element showing `Codex 26.506.31421 | prod 2620`. CodeQL flagged the generated badge browser script as code construction, so the builder now validates badge metadata against narrow version, channel, and build-token formats before generating the script; the renderer still assigns values with `textContent` and `title`. A follow-up visual check found the first bottom-right placement overlapped document/editor content, so the badge now sits in the top toolbar area with subdued styling and pointer events disabled.
+On 2026-05-15, the merged Linux version badge work from PRs #17 and #18 was reverted before pursuing a replacement. Fixed-position badges in the bottom-right content area, top toolbar, and sidebar footer all competed with upstream UI in normal app states such as editor panes and account/settings popovers. Future version visibility work should avoid persistent overlays and instead look for a real Settings/About surface or another upstream-shaped disclosure point.
 
 On 2026-05-07, CodeQL alert #1 (`actions/missing-workflow-permissions`) was validated for `.github/workflows/upstream-watch.yml`. The repository default workflow token permission was already read-only, but the workflow itself now declares `permissions: contents: read` so the appcast drift job remains least-privilege if repository defaults change.
 

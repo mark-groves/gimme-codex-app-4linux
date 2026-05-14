@@ -92,8 +92,6 @@ When the generated prod update PR merges, run the normal local update path to bu
 make update
 ```
 
-The launched Linux app shows a small version badge in the top toolbar area, for example `Codex 26.506.31421 | prod 2620`, so the visible UI can be matched to the converted app package and appcast build. Set `CODEX_LINUX_VERSION_BADGE=0` when launching to hide it.
-
 ## Build Output
 
 Generated output is local-only and ignored by git:

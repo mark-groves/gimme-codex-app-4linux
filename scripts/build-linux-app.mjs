@@ -72,7 +72,11 @@ const cacheDir = path.resolve(rootDir, options.cacheDir);
 const distDir = path.resolve(rootDir, options.distDir);
 const channel = options.channel;
 
-const latest = await latestAppcastItem(channels[channel]);
+const latest = await resolveAppcastItem({
+  channel,
+  snapshotPath: path.resolve(rootDir, options.snapshot),
+  source: options.source,
+});
 const version = latest.version;
 const build = latest.build;
 const archivePath = path.join(cacheDir, "downloads", `${channel}-${version}-${build}.zip`);
@@ -130,6 +134,8 @@ function parseArgs(argv) {
     cacheDir: ".cache",
     channel: "prod",
     distDir: "dist",
+    snapshot: "data/upstream.json",
+    source: "snapshot",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -146,8 +152,28 @@ function parseArgs(argv) {
       parsed.distDir = requiredValue(argv, ++index, arg);
       continue;
     }
+    if (arg === "--snapshot") {
+      parsed.snapshot = requiredValue(argv, ++index, arg);
+      continue;
+    }
+    if (arg === "--source") {
+      parsed.source = requiredValue(argv, ++index, arg);
+      continue;
+    }
+    if (arg === "--live") {
+      parsed.source = "live";
+      continue;
+    }
     if (arg === "--help" || arg === "-h") {
-      console.log("Usage: node scripts/build-linux-app.mjs [--channel prod|beta] [--cache-dir .cache] [--dist-dir dist]");
+      console.log(
+        [
+          "Usage: node scripts/build-linux-app.mjs [--channel prod|beta]",
+          "                                        [--source snapshot|live]",
+          "                                        [--snapshot data/upstream.json]",
+          "                                        [--cache-dir .cache]",
+          "                                        [--dist-dir dist]",
+        ].join("\n"),
+      );
       process.exit(0);
     }
     throw new Error(`unknown argument: ${arg}`);
@@ -155,6 +181,9 @@ function parseArgs(argv) {
 
   if (!Object.hasOwn(channels, parsed.channel)) {
     throw new Error(`unknown channel: ${parsed.channel}`);
+  }
+  if (!["snapshot", "live"].includes(parsed.source)) {
+    throw new Error(`unknown source: ${parsed.source}`);
   }
 
   return parsed;
@@ -215,6 +244,29 @@ function decodeXml(value) {
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">")
     .replaceAll("&amp;", "&");
+}
+
+async function resolveAppcastItem({ channel, snapshotPath, source }) {
+  if (source === "live") {
+    return latestAppcastItem(channels[channel]);
+  }
+
+  const snapshot = JSON.parse(await fs.readFile(snapshotPath, "utf8"));
+  const channelSnapshot = snapshot[channel];
+  const latest = channelSnapshot?.latest;
+  if (!latest?.version || !latest?.build || !latest?.url) {
+    throw new Error(`${snapshotPath} is missing ${channel}.latest version, build, or url`);
+  }
+
+  return {
+    appcast: channelSnapshot.appcast ?? channels[channel],
+    build: latest.build,
+    electronVersion: null,
+    length: Number(latest.length),
+    published: latest.published,
+    url: latest.url,
+    version: latest.version,
+  };
 }
 
 async function download(url, target) {

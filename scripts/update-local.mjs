@@ -12,50 +12,74 @@ const cacheDir = path.resolve(rootDir, options.cacheDir);
 const maxBuildAttempts = 2;
 
 const snapshot = await readJson(snapshotPath);
-let state = await resolveUpdateState(await fetchLiveMetadata(), snapshot);
+if (options.source === "live") {
+  await updateFromLive(snapshot);
+} else {
+  await updateFromSnapshot(snapshot);
+}
 
-if (state.snapshotDrifted || !state.targetBuildValid) {
-  for (let attempt = 1; attempt <= maxBuildAttempts; attempt += 1) {
-    const reason = attempt === 1 ? buildReason(state) : "refreshed prod appcast target missing or stale";
-    console.log(`Building prod app (${reason})...`);
-    await run("node", [
-      "scripts/build-linux-app.mjs",
-      "--channel",
-      "prod",
-      "--cache-dir",
-      path.relative(rootDir, cacheDir) || ".",
-      "--dist-dir",
-      path.relative(rootDir, distDir) || ".",
-    ]);
+async function updateFromSnapshot(snapshot) {
+  let state = await resolveSnapshotUpdateState(snapshot);
+  if (!state.targetBuildValid) {
+    console.log(`Building prod app (tracked snapshot missing or stale)...`);
+    await run("node", buildLinuxAppArgs("snapshot"));
+    state = await resolveSnapshotUpdateState(snapshot);
+  }
 
-    state = await resolveUpdateState(await fetchLiveMetadata(), snapshot);
-    if (state.targetBuildValid) {
-      break;
+  if (!state.targetBuildValid) {
+    throw new Error(`tracked prod build is missing or stale after rebuild: ${state.targetBuildDir}`);
+  }
+
+  console.log(`Installing prod app from ${state.targetBuildDir}...`);
+  await run("bash", ["scripts/install-local.sh", "--build-dir", state.targetBuildDir]);
+  console.log(`Installed tracked prod snapshot: ${state.snapshotProd.version} (${state.snapshotProd.build}).`);
+}
+
+async function updateFromLive(snapshot) {
+  let state = await resolveLiveUpdateState(await fetchLiveMetadata(), snapshot);
+
+  if (state.snapshotDrifted || !state.targetBuildValid) {
+    for (let attempt = 1; attempt <= maxBuildAttempts; attempt += 1) {
+      const reason = attempt === 1 ? buildReason(state) : "refreshed prod appcast target missing or stale";
+      console.log(`Building prod app (${reason})...`);
+      await run("node", buildLinuxAppArgs("live"));
+
+      state = await resolveLiveUpdateState(await fetchLiveMetadata(), snapshot);
+      if (state.targetBuildValid) {
+        break;
+      }
     }
+  }
+
+  if (!state.targetBuildValid) {
+    throw new Error(`prod build is missing or stale after ${maxBuildAttempts} build attempts: ${state.targetBuildDir}`);
+  }
+
+  console.log(`Installing prod app from ${state.targetBuildDir}...`);
+  await run("bash", ["scripts/install-local.sh", "--build-dir", state.targetBuildDir]);
+
+  if (state.snapshotDrifted) {
+    await writeJsonAtomic(snapshotPath, state.live);
+    console.log(`Updated upstream snapshot: ${snapshotPath}`);
+  } else {
+    console.log("Upstream snapshot already matches live prod appcast.");
   }
 }
 
-if (!state.targetBuildValid) {
-  throw new Error(`prod build is missing or stale after ${maxBuildAttempts} build attempts: ${state.targetBuildDir}`);
+async function resolveSnapshotUpdateState(snapshot) {
+  const snapshotProd = prodLatest(snapshot, "snapshot");
+  const targetBuildDir = path.join(distDir, `codex-linux-prod-${snapshotProd.version}`);
+  const targetBuildValid = await hasMatchingBuild(targetBuildDir, snapshotProd);
+  return { snapshotProd, targetBuildDir, targetBuildValid };
 }
 
-console.log(`Installing prod app from ${state.targetBuildDir}...`);
-await run("bash", ["scripts/install-local.sh", "--build-dir", state.targetBuildDir]);
-
-if (state.snapshotDrifted) {
-  await writeJsonAtomic(snapshotPath, state.live);
-  console.log(`Updated upstream snapshot: ${snapshotPath}`);
-} else {
-  console.log("Upstream snapshot already matches live prod appcast.");
-}
-
-async function resolveUpdateState(live, snapshot) {
+async function resolveLiveUpdateState(live, snapshot) {
   const liveProd = live.prod?.latest;
   if (!liveProd?.version || !liveProd?.build) {
     throw new Error("live appcast metadata is missing prod.latest.version or prod.latest.build");
   }
 
-  const snapshotProd = snapshot.prod?.latest;
+  const snapshotProd = prodLatest(snapshot, "snapshot");
   const snapshotDrifted =
     snapshotProd?.version !== liveProd.version || snapshotProd?.build !== liveProd.build;
   const targetBuildDir = path.join(distDir, `codex-linux-prod-${liveProd.version}`);
@@ -67,6 +91,22 @@ function buildReason(state) {
   return state.snapshotDrifted ? "prod appcast drift detected" : "matching prod build missing or stale";
 }
 
+function buildLinuxAppArgs(source) {
+  return [
+    "scripts/build-linux-app.mjs",
+    "--channel",
+    "prod",
+    "--source",
+    source,
+    "--snapshot",
+    path.relative(rootDir, snapshotPath) || ".",
+    "--cache-dir",
+    path.relative(rootDir, cacheDir) || ".",
+    "--dist-dir",
+    path.relative(rootDir, distDir) || ".",
+  ];
+}
+
 async function fetchLiveMetadata() {
   const { stdout } = await run("node", ["scripts/check-upstream.mjs"], { capture: true });
   return JSON.parse(stdout);
@@ -76,11 +116,19 @@ async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf8"));
 }
 
-async function hasMatchingBuild(buildDir, liveProdMetadata) {
+function prodLatest(snapshot, label) {
+  const latest = snapshot.prod?.latest;
+  if (!latest?.version || !latest?.build) {
+    throw new Error(`${label} metadata is missing prod.latest.version or prod.latest.build`);
+  }
+  return latest;
+}
+
+async function hasMatchingBuild(buildDir, prodMetadata) {
   const metadataPath = path.join(buildDir, "resources", "codex-linux-build.json");
   try {
     const metadata = await readJson(metadataPath);
-    return metadata.source?.version === liveProdMetadata.version && metadata.source?.build === liveProdMetadata.build;
+    return metadata.source?.version === prodMetadata.version && metadata.source?.build === prodMetadata.build;
   } catch (error) {
     if (error.code === "ENOENT") {
       return false;
@@ -136,6 +184,7 @@ function parseArgs(argv) {
     cacheDir: ".cache",
     distDir: "dist",
     snapshot: "data/upstream.json",
+    source: "snapshot",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -152,13 +201,30 @@ function parseArgs(argv) {
       parsed.snapshot = requiredValue(argv, ++index, arg);
       continue;
     }
+    if (arg === "--source") {
+      parsed.source = requiredValue(argv, ++index, arg);
+      continue;
+    }
+    if (arg === "--live") {
+      parsed.source = "live";
+      continue;
+    }
     if (arg === "--help" || arg === "-h") {
       console.log(
-        "Usage: node scripts/update-local.mjs [--cache-dir .cache] [--dist-dir dist] [--snapshot data/upstream.json]",
+        [
+          "Usage: node scripts/update-local.mjs [--source snapshot|live]",
+          "                                     [--cache-dir .cache]",
+          "                                     [--dist-dir dist]",
+          "                                     [--snapshot data/upstream.json]",
+        ].join("\n"),
       );
       process.exit(0);
     }
     throw new Error(`unknown argument: ${arg}`);
+  }
+
+  if (!["snapshot", "live"].includes(parsed.source)) {
+    throw new Error(`unknown source: ${parsed.source}`);
   }
 
   return parsed;

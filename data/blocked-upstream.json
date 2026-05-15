@@ -1,0 +1,9 @@
+{
+  "prod": [
+    {
+      "version": "26.513.20950",
+      "build": "2816",
+      "reason": "Electron 42 native modules do not currently rebuild on Linux; better-sqlite3 12.9.0 and 12.10.0 fail against Electron 42 V8 headers."
+    }
+  ]
+}

@@ -10,6 +10,7 @@ const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-upstream-pr-test-
 
 try {
   await testProdDriftPreparesSnapshotAndOutputs();
+  await testBlockedProdDriftDoesNotPreparePr();
   await testBetaOnlyDriftDoesNotPreparePr();
   console.log("upstream update PR tests passed");
 } finally {
@@ -55,6 +56,60 @@ async function testProdDriftPreparesSnapshotAndOutputs() {
   }
 }
 
+async function testBlockedProdDriftDoesNotPreparePr() {
+  const testDir = path.join(tmpRoot, "blocked-prod-drift");
+  await fs.mkdir(testDir, { recursive: true });
+  const snapshotPath = path.join(testDir, "upstream.json");
+  const currentPath = path.join(testDir, "current.json");
+  const blockedPath = path.join(testDir, "blocked.json");
+  const bodyPath = path.join(testDir, "body.md");
+  const outputPath = path.join(testDir, "github-output.txt");
+  const oldSnapshot = appcastSnapshot({
+    prodVersion: "1.0.0",
+    prodBuild: "100",
+    betaVersion: "1.0.0-beta",
+    betaBuild: "90",
+  });
+  const currentSnapshot = appcastSnapshot({
+    prodVersion: "1.1.0",
+    prodBuild: "110",
+    betaVersion: "1.1.0-beta",
+    betaBuild: "109",
+  });
+  const blocked = {
+    prod: [
+      {
+        version: "1.1.0",
+        build: "110",
+        reason: "test blocked native rebuild",
+      },
+    ],
+  };
+
+  await writeJson(snapshotPath, oldSnapshot);
+  await writeJson(currentPath, currentSnapshot);
+  await writeJson(blockedPath, blocked);
+  await runPrepare({ snapshotPath, currentPath, blockedPath, bodyPath, outputPath });
+
+  const writtenSnapshot = JSON.parse(await fs.readFile(snapshotPath, "utf8"));
+  assertEqual(writtenSnapshot.prod.latest.version, "1.0.0", "blocked prod drift should not rewrite prod");
+  assertEqual(writtenSnapshot.beta.latest.build, "90", "blocked prod drift should not refresh beta");
+
+  const outputs = parseGithubOutput(await fs.readFile(outputPath, "utf8"));
+  assertEqual(outputs.drift, "false", "blocked drift output");
+  assertEqual(outputs.blocked, "true", "blocked output");
+
+  try {
+    await fs.access(bodyPath);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+  throw new Error("blocked prod drift should not write a PR body");
+}
+
 async function testBetaOnlyDriftDoesNotPreparePr() {
   const testDir = path.join(tmpRoot, "beta-only");
   await fs.mkdir(testDir, { recursive: true });
@@ -96,8 +151,8 @@ async function testBetaOnlyDriftDoesNotPreparePr() {
   throw new Error("beta-only drift should not write a PR body");
 }
 
-async function runPrepare({ snapshotPath, currentPath, bodyPath, outputPath }) {
-  await run("node", [
+async function runPrepare({ snapshotPath, currentPath, blockedPath, bodyPath, outputPath }) {
+  const args = [
     "scripts/prepare-upstream-update-pr.mjs",
     "--snapshot",
     snapshotPath,
@@ -107,7 +162,11 @@ async function runPrepare({ snapshotPath, currentPath, bodyPath, outputPath }) {
     bodyPath,
     "--channel",
     "prod",
-  ], {
+  ];
+  if (blockedPath) {
+    args.push("--blocked", blockedPath);
+  }
+  await run("node", args, {
     cwd: repoRoot,
     env: { ...process.env, GITHUB_OUTPUT: outputPath },
   });

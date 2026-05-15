@@ -30,7 +30,7 @@ make update
 codex-linux
 ```
 
-`make update` is the normal local update path. It checks the live production appcast, rebuilds the converted Linux app only when prod has changed or the matching local build is missing, refreshes the user-local launcher/desktop/icon install, and updates [data/upstream.json](data/upstream.json) only after a successful build and install.
+`make update` is the normal local update path. It builds and installs the tracked production snapshot from [data/upstream.json](data/upstream.json), rebuilding only when the matching local build is missing or stale. To deliberately try the current live production appcast and refresh the tracked snapshot after a successful build/install, run `node scripts/update-local.mjs --source live`.
 
 To mirror the quickstart script's lower-level build/install steps:
 
@@ -84,7 +84,7 @@ Limit the comparison to a channel when only that channel is actionable:
 node scripts/check-upstream.mjs --compare data/upstream.json --compare-channel prod
 ```
 
-The scheduled GitHub workflow in [.github/workflows/upstream-watch.yml](.github/workflows/upstream-watch.yml) runs every 6 hours. It fetches live prod and beta metadata, uploads that metadata as an artifact, and opens or updates a PR when the production appcast changes. Beta remains visible in the snapshot and artifact, but beta-only drift does not create a PR because the local update/install path is currently prod-only.
+The scheduled GitHub workflow in [.github/workflows/upstream-watch.yml](.github/workflows/upstream-watch.yml) runs every 6 hours. It fetches live prod and beta metadata, uploads that metadata as an artifact, and opens or updates a PR when the production appcast changes. Known-unbuildable prod versions are listed in [data/blocked-upstream.json](data/blocked-upstream.json) and are skipped. Beta remains visible in the snapshot and artifact, but beta-only drift does not create a PR because the local update/install path is currently prod-only.
 
 When the generated prod update PR merges, run the normal local update path to build and install the new version:
 

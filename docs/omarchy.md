@@ -32,7 +32,7 @@ Build and install the local launcher:
 make update
 ```
 
-`make update` checks the live prod appcast, rebuilds only when the tracked prod version/build changed or the matching local build is missing/stale, installs that exact build, and updates `data/upstream.json` only after build/install succeeds.
+`make update` builds and installs the tracked prod snapshot from `data/upstream.json`, rebuilding only when the matching local build is missing/stale. To deliberately try the current live prod appcast and refresh `data/upstream.json` after a successful build/install, run `node scripts/update-local.mjs --source live`.
 
 To force the lower-level build/install path:
 
